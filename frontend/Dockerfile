@@ -8,19 +8,26 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* /app/
-RUN npm install
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+
+COPY package.json pnpm-lock.yaml* /app/
+RUN if [ -f pnpm-lock.yaml ]; then \
+			pnpm install --frozen-lockfile; \
+		else \
+			pnpm install; \
+		fi
 
 # Copy source code and build
 COPY . /app
-RUN npm run build
+RUN pnpm build
 
 FROM node:20-alpine as runtime
 
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
 
 # Copy build output and production dependencies
 COPY --from=build /app /app
@@ -29,4 +36,4 @@ COPY --from=build /app /app
 EXPOSE 3000
 
 # Start the Next.js server
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]

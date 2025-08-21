@@ -1,0 +1,48 @@
+name: Frontend Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Enable corepack and pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.15.0 --activate
+
+      - name: Approve pnpm build scripts (sharp, unrs-resolver)
+        run: pnpm approve-builds sharp unrs-resolver || true
+
+      - name: Install dependencies (pnpm)
+        run: |
+          if [ -f pnpm-lock.yaml ]; then \
+            pnpm install --frozen-lockfile; \
+          else \
+            pnpm install; \
+          fi
+
+      - name: Lint (ESLint CLI)
+        run: pnpm lint
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        run: pnpm build
