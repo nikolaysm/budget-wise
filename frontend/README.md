@@ -13,7 +13,7 @@ files, communicating with the FastAPI backend, and displaying results.
 
 ```
 frontend/
-├── package.json           # npm package configuration
+├── package.json           # package configuration
 ├── tsconfig.json          # TypeScript compiler settings
 ├── next.config.js         # Next.js configuration
 ├── pages/                 # File‑based routing
@@ -24,12 +24,21 @@ frontend/
 │   └── Layout.tsx         # Simple layout wrapper
 ├── services/              # API client abstractions
 │   └── api.ts             # Functions for calling backend endpoints
-├── styles/                # Global and modular CSS
-│   ├── globals.css
+├── styles/                # Global and modular CSS (Tailwind enabled)
+│   ├── globals.css        # includes @tailwind directives
 │   └── Home.module.css
 └── public/                # Static assets (e.g. favicon)
 ```
 
-To run the development server, install dependencies with `npm install` and run
-`npm run dev`. Ensure the FastAPI backend is running on `localhost:8000` or
-update the base URL in `services/api.ts` accordingly.
+## Development
+
+This project uses pnpm (via Corepack).
+
+- Install deps: `pnpm install`
+- Run dev server: `pnpm dev`
+- Lint: `pnpm lint`
+- Build: `pnpm build`
+- Start: `pnpm start`
+
+Ensure the FastAPI backend is running on `localhost:8000` or update the base URL
+via the `NEXT_PUBLIC_API_BASE_URL` env or in `services/api.ts` accordingly.
