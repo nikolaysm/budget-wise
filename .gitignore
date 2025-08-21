@@ -1,0 +1,64 @@
+# General
+.DS_Store
+.env
+.env.*
+!.env.example
+.env.local
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+*.eggs/
+pip-wheel-metadata/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+/.venv_*
+venv/
+env/
+.tox/
+
+# SQLAlchemy/Alembic
+alembic/versions/__pycache__/
+
+# Node/Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.env*
+backend/.env*
+
+# Docker
+*.pid
+docker-data/
+
+# Local data (databases, uploads)
+backend/*.db
+backend/app/*.db
+postgres_data/
+data/
+backend/.venv/
+backend/uv.lock
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini

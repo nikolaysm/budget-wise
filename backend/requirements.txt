@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlmodel
+alembic
+pandas
+python-dotenv
+openpyxl
+python-multipart
+# Postgres driver (psycopg3)
+psycopg[binary]
+# Pydantic v2 and settings helper
+pydantic>=2
+pydantic-settings>=2

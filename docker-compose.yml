@@ -1,0 +1,62 @@
+version: "3.9"
+
+# Docker Compose with PostgreSQL database for BudgetWise.
+# Services:
+# - postgres: PostgreSQL database with healthcheck and persisted volume
+# - backend: FastAPI + Alembic migrations
+# - frontend: Next.js application
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: budgetwise-postgres
+    environment:
+      - POSTGRES_DB=budget_db
+      - POSTGRES_USER=budget_user
+      - POSTGRES_PASSWORD=budget_pass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    container_name: budgetwise-backend
+    environment:
+      # PostgreSQL connection string (SQLAlchemy/SQLModel format)
+      - DATABASE_URL=postgresql+psycopg://budget_user:budget_pass@postgres:5432/budget_db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount the backend code to allow hot reloading in development.
+      # Comment out in production builds to improve performance.
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: budgetwise-frontend
+    environment:
+      # Base URL for API requests from the frontend
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NODE_ENV=production
+    volumes:
+      # Mount the frontend code to allow hot reloading in development.
+      # Comment out in production builds to improve performance.
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local

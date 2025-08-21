@@ -1,0 +1,22 @@
+[project]
+name = "budget-wise-backend"
+version = "0.1.0"
+description = "FastAPI backend for BudgetWise"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "sqlmodel",
+  "alembic",
+  "pandas",
+  "python-dotenv",
+  "openpyxl",
+  "python-multipart",
+  "psycopg[binary]",
+  "pydantic>=2",
+  "pydantic-settings>=2",
+]
+
+[tool.uv]
+dev-dependencies = []
