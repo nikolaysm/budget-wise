@@ -20,8 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          check-latest: false
 
       - name: Setup pnpm 10.15.0
         uses: pnpm/action-setup@v4
@@ -29,16 +28,22 @@ jobs:
           version: 10.15.0
           run_install: false
 
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
       - name: Approve pnpm build scripts (sharp, unrs-resolver)
         run: pnpm approve-builds sharp unrs-resolver || true
 
-      - name: Install dependencies (pnpm)
-        run: |
-          if [ -f pnpm-lock.yaml ]; then \
-            pnpm install --frozen-lockfile; \
-          else \
-            pnpm install; \
-          fi
+      - name: Prefetch deps to pnpm store
+        run: pnpm fetch
+
+      - name: Install dependencies (pnpm, offline)
+        run: pnpm install --frozen-lockfile --offline
 
       - name: Lint (ESLint CLI)
         run: pnpm lint
