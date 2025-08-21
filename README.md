@@ -45,13 +45,15 @@ Environment variables:
 - Default uses Postgres: `database_url=postgresql+psycopg://budget_user:budget_pass@localhost:5432/budget_db`
 - Docker overrides the database host to the `postgres` service automatically.
 
-Frontend (Next.js):
+Frontend (Next.js + pnpm):
 ```sh
 cd frontend
-npm install
-npm run dev
+corepack enable   # if not already
+pnpm install
+pnpm dev
 ```
 - Ensure `NEXT_PUBLIC_API_BASE_URL` points to your backend (defaults to http://localhost:8000 in Docker).
+- This project now uses **pnpm** (lockfile: `pnpm-lock.yaml`).
 
 ## Makefile targets
 Useful helpers (run from repo root):
@@ -62,9 +64,12 @@ Useful helpers (run from repo root):
 - `make compose-up` / `make compose-down` – Docker lifecycle
 
 ## CI
-- Pylint runs on push/PR to `main` via GitHub Actions (`.github/workflows/pylint.yml`).
+- Backend: Pylint on push/PR to `main` (`.github/workflows/pylint.yml`).
+- Frontend: Build + lint with pnpm (`.github/workflows/frontend-build.yml`).
 
 ## Notes
+- Package managers: Backend uses `uv`, frontend uses `pnpm`.
+- Tailwind CSS v4 (using `@tailwindcss/postcss` plugin) and Next.js 15.
 - The project uses Pydantic v2 and `pydantic-settings`.
 - PostgreSQL driver: `psycopg` (v3).
 - Alembic reads the database URL from app settings; compose and `.env` control it.
