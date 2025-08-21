@@ -1,0 +1,17 @@
+/* Example module CSS for the home page. */
+
+.container {
+  margin: 0 auto;
+  padding: 2rem;
+  max-width: 800px;
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.description {
+  margin-bottom: 2rem;
+  color: #555;
+}

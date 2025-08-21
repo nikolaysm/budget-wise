@@ -1,0 +1,22 @@
+[MASTER]
+ignore=__pycache__
+jobs=0
+persistent=yes
+
+[MESSAGES CONTROL]
+disable=
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+    R0903,  # too-few-public-methods (models/schemas)
+    R0902,  # too-many-instance-attributes (data models)
+    W1203,  # f-string in logging is fine for this project
+
+[BASIC]
+good-names=i,j,k,ex,df,id
+
+[FORMAT]
+max-line-length=100
+
+[TYPECHECK]
+ignore-mixin-members=yes
