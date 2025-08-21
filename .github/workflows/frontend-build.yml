@@ -23,10 +23,11 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Enable corepack and pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.15.0 --activate
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+          run_install: false
 
       - name: Approve pnpm build scripts (sharp, unrs-resolver)
         run: pnpm approve-builds sharp unrs-resolver || true
