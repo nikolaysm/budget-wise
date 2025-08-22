@@ -58,6 +58,7 @@ postgres_data/
 data/
 backend/.venv/
 backend/uv.lock
+commit.txt
 
 # OS
 Thumbs.db

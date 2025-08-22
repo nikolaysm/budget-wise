@@ -24,7 +24,9 @@ export interface Transaction {
   category?: string | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+// Use Next.js rewrite proxy to avoid exposing backend URL to the client.
+// All client-side requests go to /api/* and are rewritten server-side.
+const API_BASE_URL = '/api';
 
 /**
  * Upload a file containing transactions to the backend and return the persisted
@@ -36,14 +38,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8
 export async function uploadTransactions(file: File): Promise<Transaction[]> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await axios.post<Transaction[]>(
-    '/transactions/upload',
-    formData,
-    {
-      baseURL: API_BASE_URL,
-      headers: { 'Content-Type': 'multipart/form-data' },
-    },
-  );
+  const response = await axios.post<Transaction[]>('/transactions/upload', formData, {
+    baseURL: API_BASE_URL,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 }
 
@@ -55,13 +53,10 @@ export async function uploadTransactions(file: File): Promise<Transaction[]> {
  * @returns A promise resolving to an array of `Transaction` objects.
  */
 export async function listTransactions(skip = 0, limit = 100): Promise<Transaction[]> {
-  const response = await axios.get<Transaction[]>(
-    '/transactions',
-    {
-      baseURL: API_BASE_URL,
-      params: { skip, limit },
-    },
-  );
+  const response = await axios.get<Transaction[]>('/transactions', {
+    baseURL: API_BASE_URL,
+    params: { skip, limit },
+  });
   return response.data;
 }
 
@@ -72,11 +67,8 @@ export async function listTransactions(skip = 0, limit = 100): Promise<Transacti
  * @returns A promise resolving to a single `Transaction` object.
  */
 export async function getTransaction(id: number): Promise<Transaction> {
-  const response = await axios.get<Transaction>(
-    `/transactions/${id}`,
-    {
-      baseURL: API_BASE_URL,
-    },
-  );
+  const response = await axios.get<Transaction>(`/transactions/${id}`, {
+    baseURL: API_BASE_URL,
+  });
   return response.data;
 }
