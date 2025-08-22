@@ -22,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${DB_PORT:-5432}:5432"
 
   backend:
     build: ./backend
