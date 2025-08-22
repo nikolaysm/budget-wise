@@ -1,5 +1,3 @@
-version: "3.9"
-
 # Docker Compose with PostgreSQL database for BudgetWise.
 # Services:
 # - postgres: PostgreSQL database with healthcheck and persisted volume
@@ -23,6 +21,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${DB_PORT:-5432}:5432"
+    networks:
+      - db-network
 
   backend:
     build: ./backend
@@ -40,6 +40,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - db-network
+      - webapp
+    develop:
+      watch:
+        # Restart backend on source changes (bind mount already syncs files)
+        - action: restart
+          path: ./backend/app
+        - action: restart
+          path: ./backend/alembic
+        - action: restart
+          path: ./backend/alembic.ini
+        # Rebuild image when dependencies definition changes
+        - action: rebuild
+          path: ./backend/pyproject.toml
 
   frontend:
     build: ./frontend
@@ -54,7 +69,31 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    networks:
+      - webapp
+    develop:
+      watch:
+        # Restart frontend server on source/config updates
+        - action: restart
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - .next/
+            - .turbo/
+            - .git/
+        # Rebuild image when lockfile or package manifest changes
+        - action: rebuild
+          path: ./frontend/pnpm-lock.yaml
+        - action: rebuild
+          path: ./frontend/package.json
 
 volumes:
   postgres_data:
     driver: local
+
+networks:
+  db-network:
+    driver: bridge
+    internal: true
+  webapp:
+    driver: bridge
