@@ -11,9 +11,9 @@ services:
     image: postgres:16-alpine
     container_name: budgetwise-postgres
     environment:
-      - POSTGRES_DB=budget_db
-      - POSTGRES_USER=budget_user
-      - POSTGRES_PASSWORD=budget_pass
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -22,14 +22,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
 
   backend:
     build: ./backend
     container_name: budgetwise-backend
     environment:
       # PostgreSQL connection string (SQLAlchemy/SQLModel format)
-      - DATABASE_URL=postgresql+psycopg://budget_user:budget_pass@postgres:5432/budget_db
+      - DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT}/${DB_NAME}
       - PYTHONUNBUFFERED=1
     volumes:
       # Mount the backend code to allow hot reloading in development.
@@ -45,9 +45,7 @@ services:
     build: ./frontend
     container_name: budgetwise-frontend
     environment:
-      # Base URL for API requests from the frontend
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-      - NODE_ENV=production
+      API_BASE_URL: ${API_BASE_URL}
     volumes:
       # Mount the frontend code to allow hot reloading in development.
       # Comment out in production builds to improve performance.
