@@ -24,11 +24,8 @@ const FileUpload: React.FC = () => {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const response = await axios.post('/transactions/upload', formData, {
-        baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000',
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await axios.post('/api/transactions/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       // Handle the parsed transactions here (e.g. update state or navigate)
       console.log('Uploaded transactions:', response.data);
