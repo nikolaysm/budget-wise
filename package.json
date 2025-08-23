@@ -1,0 +1,9 @@
+{
+  "name": "budget-wise-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0"
+  }
+}
