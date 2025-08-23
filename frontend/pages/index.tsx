@@ -9,7 +9,7 @@ const Home: NextPage = () => {
         <title>Budget App</title>
         <meta name="description" content="Upload your bank statements and categorize transactions" />
       </Head>
-      <main className="p-8">
+      <main className="p-8 flex flex-col items-center justify-center min-h-screen bg-gray-50">
         <h1 className="text-3xl font-bold">Budget Control</h1>
         <p className="text-gray-600 mt-2">Upload your CSV or Excel files to parse and store your transactions.</p>
         <FileUpload />
