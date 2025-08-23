@@ -6,6 +6,8 @@ PY := $(VENV)/bin/python
 UV := uv
 UVICORN := $(VENV)/bin/uvicorn
 ALEMBIC := $(VENV)/bin/alembic
+FRONTEND_DIR := frontend
+PNPM := pnpm
 
 .PHONY: help
 help:
@@ -17,6 +19,11 @@ help:
 	@echo "  alembic-up      Apply migrations (upgrade head)"
 	@echo "  compose-up      docker compose up --build"
 	@echo "  compose-down    docker compose down -v"
+	@echo "  frontend-install Install frontend deps with pnpm"
+	@echo "  frontend-dev     Run Next.js dev server"
+	@echo "  frontend-build   Build Next.js production bundle"
+	@echo "  frontend-lint    Run ESLint on frontend"
+	@echo "  frontend-typecheck Run TypeScript type check (no emit)"
 
 $(VENV):
 	@echo "[uv] Creating project venv inside backend and syncing deps"
@@ -65,3 +72,29 @@ compose-up:
 compose-down:
 	@echo "[docker] Stopping and removing services + volumes"
 	docker compose down -v
+
+# Frontend (pnpm) helpers
+.PHONY: frontend-install
+frontend-install:
+	@echo "[frontend] Installing dependencies (pnpm)"
+	cd $(FRONTEND_DIR) && $(PNPM) install
+
+.PHONY: frontend-dev
+frontend-dev: frontend-install
+	@echo "[frontend] Starting Next.js dev server"
+	cd $(FRONTEND_DIR) && $(PNPM) dev
+
+.PHONY: frontend-build
+frontend-build: frontend-install
+	@echo "[frontend] Building Next.js production bundle"
+	cd $(FRONTEND_DIR) && $(PNPM) build
+
+.PHONY: frontend-lint
+frontend-lint: frontend-install
+	@echo "[frontend] Linting"
+	cd $(FRONTEND_DIR) && $(PNPM) lint
+
+.PHONY: frontend-typecheck
+frontend-typecheck: frontend-install
+	@echo "[frontend] Type checking"
+	cd $(FRONTEND_DIR) && $(PNPM) exec tsc --noEmit --project tsconfig.json

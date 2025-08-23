@@ -8,8 +8,10 @@ imported from `app.__init__`.
 """
 
 from fastapi import FastAPI
+from fastapi.routing import APIRouter
 
 from app.api.endpoints import transactions
+from app.version import get_version
 from app.db.init_db import init_db
 
 
@@ -19,7 +21,7 @@ def create_app() -> FastAPI:
     Returns:
         FastAPI: The configured FastAPI application.
     """
-    application = FastAPI(title="BudgetWise API", version="0.1.0")
+    application = FastAPI(title="BudgetWise API", version=get_version())
 
     @application.on_event("startup")
     def on_startup() -> None:
@@ -38,6 +40,15 @@ def create_app() -> FastAPI:
         prefix="/transactions",
         tags=["transactions"],
     )
+
+    # Lightweight version endpoint
+    version_router = APIRouter()
+
+    @version_router.get("/version", tags=["meta"])  # type: ignore[misc]
+    def version() -> dict[str, str]:
+        return {"version": get_version()}
+
+    application.include_router(version_router)
 
     return application
 

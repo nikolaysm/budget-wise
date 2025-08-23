@@ -44,6 +44,7 @@ frontend/out/
 frontend/.turbo/
 frontend/.vercel/
 frontend/.env*
+frontend/pnpm-debug.log*
 backend/.env*
 
 # Docker
@@ -57,6 +58,7 @@ postgres_data/
 data/
 backend/.venv/
 backend/uv.lock
+commit.txt
 
 # OS
 Thumbs.db
