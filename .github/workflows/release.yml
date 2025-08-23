@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type (major|minor|patch) or set"
+        required: true
+        default: patch
+      version:
+        description: "Exact version when bump is 'set' (e.g. 1.2.3)"
+        required: false
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*.*.*'
+
+  
+
+jobs:
+  bump-and-tag:
+    permissions:
+      contents: write
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bump version
+        id: bump
+        run: |
+          if [ "${{ inputs.bump }}" = "set" ]; then
+            python scripts/bump_version.py set "${{ inputs.version }}" > .new_version
+          else
+            python scripts/bump_version.py "${{ inputs.bump }}" > .new_version
+          fi
+          echo "version=$(cat .new_version)" >> $GITHUB_OUTPUT
+
+      - name: Commit changes
+        run: |
+          VERSION=$(cat .new_version)
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add frontend/package.json backend/pyproject.toml
+          git commit -m "chore(release): bump version to ${VERSION}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push --follow-tags
+
+  publish-from-tag:
+    permissions:
+      contents: read
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: ver
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Verify files have matching version
+        run: |
+          FRONT=$(jq -r .version frontend/package.json)
+          BACK=$(grep '^version\s*=\s*"' backend/pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "$FRONT" != "${{ steps.ver.outputs.version }}" ] || [ "$BACK" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "Version mismatch: front=$FRONT back=$BACK tag=${{ steps.ver.outputs.version }}" >&2
+            exit 1
+          fi
+
+      # Add build/publish steps here (Docker images, npm publish, etc.)
+      
+  auto-bump-on-push:
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Determine bump from commits
+        id: bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="$LAST_TAG..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          SUBJECTS=$(git log --pretty=%s $RANGE || true)
+          BODIES=$(git log --pretty=%b $RANGE || true)
+
+          BUMP="none"
+          # Major: explicit breaking change mark or ! in type scope
+          if echo "$BODIES" | grep -Eqi '^BREAKING CHANGE:' || echo "$SUBJECTS" | grep -Eq '^(feat|fix|perf|refactor|chore|docs|test|build|ci|style)(\([^)]*\))?!: '; then
+            BUMP="major"
+          # Minor: any feat commit
+          elif echo "$SUBJECTS" | grep -Eq '^feat(\([^)]*\))?: '; then
+            BUMP="minor"
+          # Patch: any of these types
+          elif echo "$SUBJECTS" | grep -Eq '^(fix|perf|refactor|chore|docs|test|build|ci|style)(\([^)]*\))?: '; then
+            BUMP="patch"
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+          echo "Last tag: ${LAST_TAG:-<none>}"
+          echo "Computed bump: $BUMP"
+
+      - name: Stop if no release needed
+        if: steps.bump.outputs.bump == 'none'
+        run: echo "No conventional commits since last tag. Skipping release."
+
+      - name: Bump, commit, and tag
+        if: steps.bump.outputs.bump != 'none'
+        run: |
+          python scripts/bump_version.py "${{ steps.bump.outputs.bump }}" > .new_version
+          VERSION=$(cat .new_version)
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add frontend/package.json backend/pyproject.toml
+          git commit -m "chore(release): bump version to ${VERSION}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push --follow-tags

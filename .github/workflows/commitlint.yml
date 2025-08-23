@@ -1,0 +1,41 @@
+name: Commitlint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install commitlint locally
+        run: pnpm add -D @commitlint/cli@19.5.0 @commitlint/config-conventional@19.5.0
+
+      - name: Lint commit messages
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking commits..."
+          # For PRs, lint commits from the merge-base with the target branch
+          BASE_COMMIT=$(git merge-base origin/${{ github.base_ref }} HEAD || git rev-list --max-parents=0 HEAD | tail -n1)
+          echo "Base commit: $BASE_COMMIT"
+          git log --format=%H:%s $BASE_COMMIT..HEAD || true
+          pnpm exec commitlint --config .commitlintrc.yml --from $BASE_COMMIT --to HEAD

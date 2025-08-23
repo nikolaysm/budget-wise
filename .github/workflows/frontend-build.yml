@@ -1,0 +1,58 @@
+name: Frontend Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          check-latest: false
+
+      - name: Setup pnpm 10.15.0
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+          run_install: false
+
+      - name: Determine pnpm store path
+        id: pnpm_store
+        run: echo "store=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm_store.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Approve pnpm build scripts (sharp, unrs-resolver)
+        run: pnpm approve-builds sharp unrs-resolver || true
+
+      - name: Prefetch deps to pnpm store
+        run: pnpm fetch
+
+      - name: Install dependencies (pnpm, offline)
+        run: pnpm install --frozen-lockfile --offline
+
+      - name: Lint (ESLint CLI)
+        run: pnpm lint
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        run: pnpm build
