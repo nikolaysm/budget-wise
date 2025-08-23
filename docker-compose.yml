@@ -94,6 +94,6 @@ volumes:
 networks:
   db-network:
     driver: bridge
-    internal: true
+    internal: ${INTERNAL_DB_NETWORK:-false}
   webapp:
     driver: bridge
