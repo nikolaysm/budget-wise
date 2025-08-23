@@ -47,7 +47,35 @@ jobs:
             HEAD_SHA="${{ github.event.after }}"
             # Handle initial commit (before can be all zeros)
             if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then
-              BASE_SHA=$(git rev-list --max-parents=0 HEAD | tail -n1)
+              echo "Detected branch creation push (all-zero before). Using per-commit lint from event payload."
+              # Early per-commit lint for new branch pushes
+              if command -v jq >/dev/null 2>&1; then
+                COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
+                if [ "$COUNT" -eq 0 ]; then
+                  echo "No commits in event payload. Nothing to lint."
+                  exit 0
+                fi
+                FAIL=0
+                for SHA in $(jq -r '.commits[].id' "$GITHUB_EVENT_PATH"); do
+                  MSG=$(git show -s --format=%B "$SHA" 2>/dev/null || true)
+                  if [ -z "$MSG" ]; then
+                    echo "Warning: could not read commit $SHA; skipping."
+                    continue
+                  fi
+                  echo "Linting commit $SHA"
+                  if ! printf "%s" "$MSG" | pnpm exec commitlint --config .commitlintrc.yml; then
+                    FAIL=1
+                  fi
+                done
+                if [ $FAIL -ne 0 ]; then
+                  echo "Commitlint failed for one or more commits."
+                  exit 1
+                fi
+                exit 0
+              else
+                echo "jq not available; cannot lint per-commit for new branch push. Failing."
+                exit 2
+              fi
             fi
             if [ -z "$HEAD_SHA" ]; then
               HEAD_SHA="HEAD"
