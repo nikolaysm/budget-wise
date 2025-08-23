@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Database URL in SQLAlchemy format
     # Example: postgresql+psycopg://user:password@localhost:5432/budget_db
     database_url: str = "sqlite:///./budget_wise.db"
+    db_echo: bool = True
 
 
 @lru_cache()

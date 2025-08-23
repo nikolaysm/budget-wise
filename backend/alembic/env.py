@@ -17,7 +17,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-sys.path.append(str(Path(__file__).resolve().parents[1] / "app"))  # noqa: E402
+# sys.path.append(str(Path(__file__).resolve().parents[1] / "app"))  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
 import app.models.transaction  # noqa: F401  # ensure Transaction model is loaded
