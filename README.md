@@ -66,6 +66,52 @@ Useful helpers (run from repo root):
 ## CI
 - Backend: Pylint on push/PR to `main` (`.github/workflows/pylint.yml`).
 - Frontend: Build + lint with pnpm (`.github/workflows/frontend-build.yml`).
+- Commit messages: Conventional Commits enforced by commitlint (`.github/workflows/commitlint.yml`).
+	- Types used for versioning: `feat` → minor, `fix`/`perf`/`refactor`/`chore`/`docs`/`test`/`build`/`ci`/`style` → patch, add `!` or `BREAKING CHANGE:` for major.
+	- Examples:
+		- `feat: add budgets page`
+		- `fix(upload): handle semicolon delimiter`
+		- `feat!: change upload API` with body containing `BREAKING CHANGE: ...`
+
+## Commit message guidelines
+
+We use Conventional Commits so releases can be automated. Keep messages small and descriptive:
+
+- Format: `type(scope)!: subject`
+	- `type`: one of `feat`, `fix`, `perf`, `refactor`, `chore`, `docs`, `test`, `build`, `ci`, `style`.
+	- `scope` (optional): area like `frontend`, `backend`, `upload`, `db`, `pipeline`.
+	- `!` marks a breaking change (also add a `BREAKING CHANGE:` line in the body).
+- Header rules (enforced):
+	- Max 100 characters
+	- No trailing period
+- Body (optional but recommended):
+	- Leave a blank line between header and body
+	- Explain what and why, wrap lines around ~72–100 chars
+- Breaking changes:
+	- Use either `feat(scope)!: ...` or add a footer line: `BREAKING CHANGE: describe impact and migration`
+
+Quick examples:
+- `feat(frontend): add dropzone upload with progress`
+- `fix(backend): parse CSV with semicolon delimiter`
+- `chore(ci): add commitlint workflow`
+- `docs: update README with versioning instructions`
+- `refactor(api): simplify upload handler`
+- `perf(db): speed up transaction listing query`
+- `test: add unit tests for version endpoint`
+
+## Versioning & releases
+
+This repo uses Semantic Versioning (SemVer) and tags releases automatically:
+
+- Auto-bump on default branch merges: `.github/workflows/release.yml` reads commit messages since the last tag and bumps versions in:
+	- `frontend/package.json` (source for `/api/version` in the frontend)
+	- `backend/pyproject.toml` (source for the FastAPI app version and `/version` endpoint)
+- The workflow commits the bump and tags `vX.Y.Z`. A second job validates versions match the tag.
+- Manual release: trigger the "Release" workflow with `bump=major|minor|patch` or `set 1.2.3`.
+
+Endpoints:
+- Backend: `GET /version` → `{ "version": "X.Y.Z" }`
+- Frontend: `GET /api/version` → `{ "version": "X.Y.Z" }`
 
 ## Notes
 - Package managers: Backend uses `uv`, frontend uses `pnpm`.

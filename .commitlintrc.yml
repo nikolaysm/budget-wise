@@ -1,0 +1,9 @@
+extends:
+  - '@commitlint/config-conventional'
+
+# Optional tweaks
+rules:
+  # Allow any subject case (teams often prefer natural sentence case)
+  subject-case: [0]
+  # Keep default max header length
+  header-max-length: [2, 'always', 100]
