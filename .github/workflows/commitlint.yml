@@ -17,6 +17,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+
+      - name: Fetch all branches
+        run: git fetch --all --tags --prune
 
       - uses: pnpm/action-setup@v4
         with:
@@ -34,8 +38,80 @@ jobs:
         run: |
           set -euo pipefail
           echo "Checking commits..."
-          # For PRs, lint commits from the merge-base with the target branch
-          BASE_COMMIT=$(git merge-base origin/${{ github.base_ref }} HEAD || git rev-list --max-parents=0 HEAD | tail -n1)
-          echo "Base commit: $BASE_COMMIT"
-          git log --format=%H:%s $BASE_COMMIT..HEAD || true
-          pnpm exec commitlint --config .commitlintrc.yml --from $BASE_COMMIT --to HEAD
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            # For push events, lint only the commits in this push
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.event.after }}"
+            # Handle initial commit (before can be all zeros)
+            if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASE_SHA" ]; then
+              BASE_SHA=$(git rev-list --max-parents=0 HEAD | tail -n1)
+            fi
+            if [ -z "$HEAD_SHA" ]; then
+              HEAD_SHA="HEAD"
+            fi
+          fi
+          echo "Base: $BASE_SHA"
+          echo "Head: $HEAD_SHA"
+          echo "Debug SHAs existence:"
+          git show "$BASE_SHA" >/dev/null 2>&1 || echo "Base SHA missing locally"
+          git show "$HEAD_SHA" >/dev/null 2>&1 || echo "Head SHA missing locally"
+          # Attempt to fetch again if SHAs are missing (e.g., after force-push)
+          MISSING=0
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then MISSING=1; fi
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then MISSING=1; fi
+          if [ $MISSING -eq 1 ]; then
+            echo "Fetching to resolve missing SHAs..."
+            git fetch --all --tags --prune || true
+          fi
+          if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
+            echo "No new commits to lint."
+            exit 0
+          fi
+          RANGE_OK=1
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then RANGE_OK=0; fi
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then RANGE_OK=0; fi
+          if [ $RANGE_OK -eq 1 ]; then
+            if ! git log --format=%H:%s ${BASE_SHA}..${HEAD_SHA} >/dev/null; then RANGE_OK=0; fi
+          fi
+          if [ $RANGE_OK -eq 1 ]; then
+            git log --format=%H:%s ${BASE_SHA}..${HEAD_SHA} || true
+            pnpm exec commitlint --config .commitlintrc.yml --from ${BASE_SHA} --to ${HEAD_SHA}
+          else
+            echo "Range invalid or SHAs missing. Falling back to per-commit lint (push event)."
+            # Iterate commits from the GitHub event payload (requires jq on ubuntu-latest)
+            if [ "${{ github.event_name }}" = "push" ]; then
+              if command -v jq >/dev/null 2>&1; then
+                COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
+                if [ "$COUNT" -eq 0 ]; then
+                  echo "No commits in event payload. Nothing to lint."
+                  exit 0
+                fi
+                FAIL=0
+                for SHA in $(jq -r '.commits[].id' "$GITHUB_EVENT_PATH"); do
+                  MSG=$(git show -s --format=%B "$SHA" 2>/dev/null || true)
+                  if [ -z "$MSG" ]; then
+                    echo "Warning: could not read commit $SHA; skipping."
+                    continue
+                  fi
+                  echo "Linting commit $SHA"
+                  if ! printf "%s" "$MSG" | pnpm exec commitlint --config .commitlintrc.yml; then
+                    FAIL=1
+                  fi
+                done
+                if [ $FAIL -ne 0 ]; then
+                  echo "Commitlint failed for one or more commits."
+                  exit 1
+                fi
+                exit 0
+              else
+                echo "jq not available; cannot fall back to per-commit lint. Failing."
+                exit 2
+              fi
+            else
+              echo "Unexpected event in fallback path. Failing."
+              exit 2
+            fi
+          fi
