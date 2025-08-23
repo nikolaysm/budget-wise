@@ -46,7 +46,7 @@ uv-update: $(VENV)
 	cd backend && $(UV) sync
 
 .PHONY: run-backend
-run-backend: uv-setup
+run-backend: uv-setup uv-update
 	@echo "[run] Starting FastAPI (reload)"
 	[ -f "$$HOME/.local/bin/env" ] && . "$$HOME/.local/bin/env" || true; export PATH="$$HOME/.local/bin:$$PATH"; \
 	cd backend && $(UV) run uvicorn app.main:app --reload
@@ -73,6 +73,12 @@ compose-down:
 	@echo "[docker] Stopping and removing services + volumes"
 	docker compose down -v
 
+# Add docker watchers for frontend and backend
+.PHONY: compose-watch
+compose-watch:
+	@echo "[docker] Building and starting services with watchers"
+	docker compose up --watch --build
+
 # Frontend (pnpm) helpers
 .PHONY: frontend-install
 frontend-install:
@@ -98,3 +104,8 @@ frontend-lint: frontend-install
 frontend-typecheck: frontend-install
 	@echo "[frontend] Type checking"
 	cd $(FRONTEND_DIR) && $(PNPM) exec tsc --noEmit --project tsconfig.json
+
+.PHONY: run-db
+run-db:
+	@echo "[docker] Starting Postgres database"
+	docker compose up -d postgres
