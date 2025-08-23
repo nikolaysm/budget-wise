@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Upload, Loader2 } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import { Progress } from '@/components/ui/progress';
+import { X } from "lucide-react"
 
 /**
  * FileUpload component allows users to select and submit CSV or Excel files
@@ -51,36 +52,48 @@ const FileUpload: React.FC = () => {
   };
 
   return (
-    <div className="mt-6 max-w-xl space-y-4">
-      <Dropzone
-        accept={{
-          'text/csv': ['.csv'],
-          'application/vnd.ms-excel': ['.xls'],
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-        }}
-        maxFiles={1}
-        disabled={isUploading}
-        src={file ? [file] : undefined}
-        onDrop={(accepted) => setFile(accepted[0] || null)}
-      >
-        <DropzoneContent />
-        <DropzoneEmptyState />
-      </Dropzone>
-
-      <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" onClick={() => setFile(null)} disabled={!file || isUploading}>
-          Clear
-        </Button>
+    <div className="mt-6 min-w-xl max-w-xl space-y-4">
+      <div
+        className="relative flex size-full flex-col gap-4 rounded-md
+          overflow-hidden bg-muted items-center justify-center"
+        >
+        <div className="flex w-full justify-end cursor-pointer">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setFile(null)}
+            disabled={!file || isUploading}
+          >
+            <X />
+          </Button>
+        </div>
+        <Dropzone
+          className="border-dashed cursor-pointer rounded-t-none"
+          accept={{
+            'text/csv': ['.csv'],
+            'application/vnd.ms-excel': ['.xls'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+          }}
+          maxFiles={1}
+          disabled={isUploading}
+          src={file ? [file] : undefined}
+          onDrop={(accepted) => setFile(accepted[0] || null)}
+        >
+          <DropzoneContent />
+          <DropzoneEmptyState />
+        </Dropzone>
       </div>
 
       <form onSubmit={handleSubmit}>
           <Button
+            variant="secondary"
             type="submit"
             size="lg"
             disabled={!file || isUploading}
             className={cn(
               'group shadow-sm hover:shadow-md transition-all',
-              'ring-1 ring-black/10 hover:ring-black/20'
+              'ring-1 ring-black/10 hover:ring-black/20',
+              'w-full cursor-pointer'
             )}
           >
             {isUploading ? (
@@ -112,7 +125,7 @@ const FileUpload: React.FC = () => {
             {success}
           </div>
         )}
-  {error && (
+        {error && (
           <div className="mt-3 inline-flex items-center gap-2 text-red-600 text-sm">
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <circle cx="12" cy="12" r="10" />
