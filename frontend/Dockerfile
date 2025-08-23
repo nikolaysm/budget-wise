@@ -4,7 +4,7 @@
 # serves it using the built‑in Next.js server. The build step runs in a
 # separate stage to keep the runtime image as small as possible.
 
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN if [ -f pnpm-lock.yaml ]; then \
 COPY . /app
 RUN pnpm build
 
-FROM node:20-alpine as runtime
+FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
