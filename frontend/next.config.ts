@@ -1,5 +1,10 @@
 const nextConfig = {
-  reactStrictMode: true,
+  // reactStrictMode: true,
+  output: 'standalone',
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
+  },
   // Proxy API calls to the backend without exposing the URL in the client
   async rewrites() {
     const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
@@ -18,4 +23,4 @@ const nextConfig = {
   // Modify the `images` domain list if you need external images
 };
 
-module.exports = nextConfig;
+export default nextConfig;

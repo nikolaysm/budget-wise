@@ -19,7 +19,7 @@ settings = get_settings()
 # environment variables.
 engine = create_engine(
     settings.database_url,
-    echo=True,
+    echo=settings.db_echo,
     pool_pre_ping=True,
 )
 
