@@ -58,8 +58,9 @@ const FileUpload: React.FC = () => {
         className="relative flex size-full flex-col gap-4 rounded-md
           overflow-hidden bg-muted items-center justify-center"
         >
-        <div className="flex w-full justify-end cursor-pointer">
+        <div className="flex w-full justify-end">
           <Button
+            className="cursor-pointer"
             type="button"
             variant="ghost"
             onClick={() => setFile(null)}

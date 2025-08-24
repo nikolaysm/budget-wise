@@ -19,6 +19,9 @@ help:
 	@echo "  alembic-up      Apply migrations (upgrade head)"
 	@echo "  compose-up      docker compose up --build"
 	@echo "  compose-down    docker compose down -v"
+	@echo "  compose-watch   docker compose up --watch --build (dev)"
+	@echo "  compose-down-watch docker compose down --remove-orphans (dev)"
+	@echo "  run-db          Start Postgres database (docker compose up -d postgres
 	@echo "  frontend-install Install frontend deps with pnpm"
 	@echo "  frontend-dev     Run Next.js dev server"
 	@echo "  frontend-build   Build Next.js production bundle"
@@ -51,7 +54,6 @@ run-backend: uv-setup uv-update
 	[ -f "$$HOME/.local/bin/env" ] && . "$$HOME/.local/bin/env" || true; export PATH="$$HOME/.local/bin:$$PATH"; \
 	cd backend && $(UV) run uvicorn app.main:app --reload
 
-
 .PHONY: alembic-rev
 alembic-rev: uv-setup
 	@if [ -z "$(AUTOGEN)" ]; then echo "Usage: make alembic-rev AUTOGEN=message"; exit 1; fi
@@ -70,14 +72,18 @@ compose-up:
 
 .PHONY: compose-down
 compose-down:
-	@echo "[docker] Stopping and removing services + volumes"
-	docker compose down -v
+	@echo "[docker] Stopping and removing services + orphans"
+	docker compose down --remove-orphans
 
-# Add docker watchers for frontend and backend
 .PHONY: compose-watch
 compose-watch:
 	@echo "[docker] Building and starting services with watchers"
-	docker compose up --watch --build
+	docker compose -f docker-compose.dev.yml up --watch --build
+
+.PHONY: compose-watch-down
+compose-watch-down:
+	@echo "[docker] Stopping and removing services + orphans"
+	docker compose -f docker-compose.dev.yml down --remove-orphans
 
 # Frontend (pnpm) helpers
 .PHONY: frontend-install
@@ -108,4 +114,4 @@ frontend-typecheck: frontend-install
 .PHONY: run-db
 run-db:
 	@echo "[docker] Starting Postgres database"
-	docker compose up -d postgres
+	docker compose -f docker-compose.dev.yml up -d postgres

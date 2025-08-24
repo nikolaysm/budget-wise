@@ -9,9 +9,9 @@ services:
     image: postgres:16-alpine
     container_name: budgetwise-postgres
     environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -19,8 +19,6 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT:-5432}:5432"
     networks:
       - db-network
 
@@ -29,12 +27,9 @@ services:
     container_name: budgetwise-backend
     environment:
       # PostgreSQL connection string (SQLAlchemy/SQLModel format)
-      - DATABASE_URL=postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@postgres:${DB_PORT}/${DB_NAME}
-      - PYTHONUNBUFFERED=1
-    volumes:
-      # Mount the backend code to allow hot reloading in development.
-      # Comment out in production builds to improve performance.
-      - ./backend:/app
+      DB_ECHO: ${DB_ECHO:-false}
+      DATABASE_URL: postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      PYTHONUNBUFFERED: 1
     ports:
       - "8000:8000"
     depends_on:
@@ -43,49 +38,21 @@ services:
     networks:
       - db-network
       - webapp
-    develop:
-      watch:
-        # Restart backend on source changes (bind mount already syncs files)
-        - action: restart
-          path: ./backend/app
-        - action: restart
-          path: ./backend/alembic
-        - action: restart
-          path: ./backend/alembic.ini
-        # Rebuild image when dependencies definition changes
-        - action: rebuild
-          path: ./backend/pyproject.toml
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      target: runner
     container_name: budgetwise-frontend
     environment:
       API_BASE_URL: ${API_BASE_URL}
-    volumes:
-      # Mount the frontend code to allow hot reloading in development.
-      # Comment out in production builds to improve performance.
-      - ./frontend:/app
+      NEXT_TELEMETRY_DISABLED: 1
     ports:
       - "3000:3000"
     depends_on:
       - backend
     networks:
       - webapp
-    develop:
-      watch:
-        # Restart frontend server on source/config updates
-        - action: restart
-          path: ./frontend
-          ignore:
-            - node_modules/
-            - .next/
-            - .turbo/
-            - .git/
-        # Rebuild image when lockfile or package manifest changes
-        - action: rebuild
-          path: ./frontend/pnpm-lock.yaml
-        - action: rebuild
-          path: ./frontend/package.json
 
 volumes:
   postgres_data:
@@ -94,6 +61,6 @@ volumes:
 networks:
   db-network:
     driver: bridge
-    internal: ${INTERNAL_DB_NETWORK:-false}
+    internal: true
   webapp:
     driver: bridge
