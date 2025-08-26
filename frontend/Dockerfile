@@ -40,12 +40,6 @@ COPY --from=deps /app/node_modules ./node_modules
 # Build the application
 RUN pnpm build
 
-RUN echo "Build output:"
-RUN ls -la ./
-RUN ls -la ./.next
-RUN pwd
-RUN echo "Contents end"
-
 ######## runtime ########
 FROM base AS runner
 
@@ -64,12 +58,6 @@ COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nextjs /app/public ./public
 
 USER nextjs
-
-RUN echo "Build output:"
-RUN ls -la ./
-RUN ls -la ./.next
-RUN pwd
-RUN echo "Contents end"
 
 EXPOSE 3000
 
