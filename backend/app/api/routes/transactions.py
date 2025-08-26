@@ -10,7 +10,6 @@ transactions and retrieval by ID.
 from __future__ import annotations
 
 import io
-from typing import List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -20,19 +19,18 @@ from app.api.deps import get_db
 from app.crud.transaction import create_transaction, get_transaction, get_transactions
 from app.models.transaction import Transaction
 
-
 router = APIRouter()
 
 
 @router.post(
     "/upload",
-    response_model=List[Transaction],
+    response_model=list[Transaction],
     summary="Upload transactions from a CSV or Excel file",
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_transactions(
-    *, file: UploadFile = File(...), db: Session = Depends(get_db)
-) -> List[Transaction]:
+    *, file: UploadFile = File(...), db: Session = Depends(get_db)  # noqa: B008
+) -> list[Transaction]:
     """Parse the uploaded file and persist each transaction.
 
     The file must contain a header row with expected column names. Supported
@@ -88,7 +86,7 @@ async def upload_transactions(
             detail=f"Missing expected columns: {missing}",
         )
 
-    transactions: List[Transaction] = []
+    transactions: list[Transaction] = []
     for _, row in df.iterrows():
         transaction = Transaction(
             account=str(row["Rekening"]),
@@ -138,26 +136,26 @@ async def upload_transactions(
 
 @router.get(
     "/",
-    response_model=List[Transaction],
+    response_model=list[Transaction],
     summary="List transactions",
 )
 def list_transactions(
     *,
-    skip: int = 0,
+    offset: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db),
-) -> List[Transaction]:
+    db: Session = Depends(get_db),  # noqa: B008
+) -> list[Transaction]:
     """Retrieve a paginated list of transactions.
 
     Args:
-        skip (int, optional): Number of records to skip. Defaults to 0.
+        offset (int, optional): Number of records to offset. Defaults to 0.
         limit (int, optional): Maximum number of records to return. Defaults to 100.
         db (Session): Database session dependency.
 
     Returns:
         List[Transaction]: A list of transactions.
     """
-    return get_transactions(db, skip=skip, limit=limit)
+    return get_transactions(db, offset=offset, limit=limit)
 
 
 @router.get(
@@ -168,7 +166,7 @@ def list_transactions(
 def read_transaction(
     *,
     transaction_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # noqa: B008
 ) -> Transaction:
     """Retrieve a single transaction by its primary key.
 

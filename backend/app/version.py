@@ -7,19 +7,16 @@ Order of precedence:
 
 from __future__ import annotations
 
+import logging
+import tomllib
 from pathlib import Path
 
-try:
-    import tomllib  # Python 3.11+
-except Exception:  # pragma: no cover
-    tomllib = None  # type: ignore
+logger = logging.getLogger(__name__)
 
 
 def get_version() -> str:
     # Attempt to read pyproject.toml next to this file (backend root)
     try:
-        if tomllib is None:
-            raise RuntimeError("tomllib unavailable")
         project_root = Path(__file__).resolve().parents[1]  # backend/
         pyproject = project_root / "pyproject.toml"
         if pyproject.is_file():
@@ -28,6 +25,6 @@ def get_version() -> str:
             if isinstance(version, str) and version:
                 return version
     except Exception:
-        pass
+        logger.exception("Failed to read version from pyproject.toml")
 
     return "0.0.0-dev"

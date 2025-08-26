@@ -1,0 +1,52 @@
+name: Ruff
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Determine uv cache dir
+        id: uv-cache
+        run: |
+          echo "dir=$(uv cache dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.uv-cache.outputs.dir }}
+          key: uv-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-
+
+      - name: Install dependencies (backend dev)
+        run: |
+          uv sync --directory backend
+
+      - name: Ruff Lint
+        working-directory: backend
+        run: |
+          uv run ruff check app
+
+      - name: Ruff Format (Check)
+        working-directory: backend
+        run: |
+          uv run ruff format --check app

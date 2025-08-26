@@ -9,23 +9,23 @@ plaintext passwords.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from sqlmodel import Field, Relationship, SQLModel
+
+from .account import Account
 
 
 class UserBase(SQLModel):
     """Base attributes for User models."""
 
     email: str = Field(index=True, unique=True)
-    full_name: Optional[str] = None
+    full_name: str | None = None
     is_active: bool = True
 
 
 class User(UserBase, table=True):
     """Database model representing an application user."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
     # One-to-many relationship: a user can have multiple accounts
-    accounts: List["Account"] = Relationship(back_populates="user")
+    accounts: list[Account] = Relationship(back_populates="user")
