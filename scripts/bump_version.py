@@ -22,6 +22,14 @@ FRONTEND_PKG = ROOT / "frontend" / "package.json"
 BACKEND_PYPROJECT = ROOT / "backend" / "pyproject.toml"
 
 
+def ensure_files() -> None:
+    missing = [p for p in (FRONTEND_PKG, BACKEND_PYPROJECT) if not p.exists()]
+    if missing:
+        paths = ", ".join(str(p) for p in missing)
+        print(f"Missing required file(s): {paths}", file=sys.stderr)
+        raise SystemExit(2)
+
+
 def read_frontend_version() -> str:
     data = json.loads(FRONTEND_PKG.read_text(encoding="utf-8"))
     return str(data.get("version", "0.0.0"))
@@ -35,18 +43,27 @@ def write_frontend_version(version: str) -> None:
 
 def read_backend_version() -> str:
     text = BACKEND_PYPROJECT.read_text(encoding="utf-8")
-    m = re.search(r"^version\s*=\s*\"([0-9]+\.[0-9]+\.[0-9]+)\"\s*$", text, flags=re.M)
+    m = re.search(r'(?m)^\s*version\s*=\s*["\'](\d+\.\d+\.\d+)["\']', text)
     return m.group(1) if m else "0.0.0"
 
 
 def write_backend_version(version: str) -> None:
     text = BACKEND_PYPROJECT.read_text(encoding="utf-8")
-    new_text = re.sub(
-        r"(^version\s*=\s*\")[0-9]+\.[0-9]+\.[0-9]+(\"\s*$)",
-        rf"\g<1>{version}\g<2>",
-        text,
-        flags=re.M,
+    # isolate the [project] section (non-greedy up to next section or EOF)
+    sec = re.search(r'(?ms)^\[project\]\s*(.*?)(?=^\[|\Z)', text)
+    if not sec:
+        print("Missing [project] section in backend/pyproject.toml", file=sys.stderr)
+        raise SystemExit(2)
+    block = sec.group(1)
+    new_block, count = re.subn(
+        r'(?m)^(\s*version\s*=\s*["\'])\d+\.\d+\.\d+(["\'][^\n]*$)',
+        rf"\1{version}\2",
+        block,
     )
+    if count == 0:
+        print('No version key like: version = "X.Y.Z" inside [project]', file=sys.stderr)
+        raise SystemExit(2)
+    new_text = text[:sec.start(1)] + new_block + text[sec.end(1):]
     BACKEND_PYPROJECT.write_text(new_text, encoding="utf-8")
 
 
@@ -62,6 +79,8 @@ def bump(ver: str, mode: str) -> str:
 
 
 def main(argv: list[str]) -> int:
+    ensure_files()
+    semver = re.compile(r"^\d+\.\d+\.\d+$")
     if len(argv) < 2:
         print("Usage: bump_version.py [major|minor|patch|set <x.y.z>]")
         return 2
@@ -78,10 +97,16 @@ def main(argv: list[str]) -> int:
             return 2
         # Source of truth: frontend/package.json
         current = read_frontend_version()
+        if not semver.match(current):
+            print(
+                f'frontend/package.json "version" must be X.Y.Z (got: {current})',
+                file=sys.stderr,
+            )
+            return 2
         new_version = bump(current, mode)
 
-    write_frontend_version(new_version)
     write_backend_version(new_version)
+    write_frontend_version(new_version)
     print(new_version)
     return 0
 

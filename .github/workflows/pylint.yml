@@ -1,4 +1,4 @@
-name: Pylint
+name: Pylint (legacy)
 
 on:
   push:
@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Notice
+        run: echo "Ruff is the primary linter. This job remains for transitional visibility."
 
       - name: Set up Python
         id: setup-python

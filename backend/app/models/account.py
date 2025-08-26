@@ -7,27 +7,28 @@ extended to include additional metadata such as bank name or IBAN.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from sqlmodel import Field, Relationship, SQLModel
+
+from .transaction import Transaction
+from .user import User
 
 
 class AccountBase(SQLModel):
     """Base attributes for the Account model."""
 
     number: str = Field(index=True)
-    bic: Optional[str] = None
-    bank_name: Optional[str] = None
-    currency: Optional[str] = None
+    bic: str | None = None
+    bank_name: str | None = None
+    currency: str | None = None
 
 
 class Account(AccountBase, table=True):
     """Database model representing a bank account."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, foreign_key="user.id")
     # Relationships
-    user: Optional["User"] = Relationship(back_populates="accounts")
+    user: User | None = Relationship(back_populates="accounts")
     # A one-to-many relationship to `Transaction`. The corresponding attribute on
     # Transaction is `account_ref` to avoid name clashes with the raw `account` field.
-    transactions: List["Transaction"] = Relationship(back_populates="account_ref")
+    transactions: list[Transaction] = Relationship(back_populates="account_ref")

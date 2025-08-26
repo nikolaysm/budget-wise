@@ -5,7 +5,7 @@ These dependencies can be overridden in tests to provide test database
 connections or mocked services.
 """
 
-from typing import Generator
+from collections.abc import Generator
 
 from sqlmodel import Session
 

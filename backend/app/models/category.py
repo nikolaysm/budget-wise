@@ -9,9 +9,9 @@ defined via the `transactions` attribute.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from sqlmodel import Field, Relationship, SQLModel
+
+from .transaction import Transaction
 
 
 class CategoryBase(SQLModel):
@@ -23,6 +23,6 @@ class CategoryBase(SQLModel):
 class Category(CategoryBase, table=True):
     """Database model for a transaction category."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # Establish one‑to‑many relationship with Transaction
-    transactions: List["Transaction"] = Relationship(back_populates="category")
+    transactions: list[Transaction] = Relationship(back_populates="category")

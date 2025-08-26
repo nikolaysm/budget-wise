@@ -5,12 +5,11 @@ This module creates a SQLAlchemy engine via SQLModel and exposes a
 dependency function for obtaining a database session within FastAPI routes.
 """
 
-from typing import Generator
+from collections.abc import Generator
 
-from sqlmodel import create_engine, Session
+from sqlmodel import Session, create_engine
 
 from app.core.config import get_settings
-
 
 settings = get_settings()
 
