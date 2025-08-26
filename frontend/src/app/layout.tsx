@@ -4,7 +4,7 @@ import Header from '@/components/header'
 import Footer from '@/components/footer'
 
 export const metadata = {
-  title: 'Budget App',
+  title: 'Budget Wise',
   description: 'Upload your bank statements and categorize transactions',
 }
 
