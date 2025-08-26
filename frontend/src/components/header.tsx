@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import BudgetWiseIcon from '~/public/budget-wise-logo.min.svg'
 
 export default function Header() {
   return (
@@ -8,7 +7,7 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <Image
-            src={BudgetWiseIcon}
+            src="/budget-wise-logo.min.svg"
             alt="Budget Wise logo"
             width={28}
             height={28}
