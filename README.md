@@ -52,7 +52,7 @@ corepack enable   # if not already
 pnpm install
 pnpm dev
 ```
-- Ensure `NEXT_PUBLIC_API_BASE_URL` points to your backend (defaults to http://localhost:8000 in Docker).
+- Ensure `API_BASE_URL` points to your backend (defaults to http://localhost:8000 in Docker).
 - This project now uses **pnpm** (lockfile: `pnpm-lock.yaml`).
 
 ## Makefile targets

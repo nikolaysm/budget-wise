@@ -21,7 +21,7 @@ help:
 	@echo "  compose-down    docker compose down -v"
 	@echo "  compose-watch   docker compose up --watch --build (dev)"
 	@echo "  compose-down-watch docker compose down --remove-orphans (dev)"
-	@echo "  run-db          Start Postgres database (docker compose up -d postgres
+	@echo "  run-db           Start Postgres database (dev)"
 	@echo "  frontend-install Install frontend deps with pnpm"
 	@echo "  frontend-dev     Run Next.js dev server"
 	@echo "  frontend-build   Build Next.js production bundle"
