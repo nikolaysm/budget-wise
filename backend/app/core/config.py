@@ -8,17 +8,15 @@ environment on each call.
 """
 
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Configuration values loaded from environment variables or defaults."""
+
     # Use case-insensitive env vars so DATABASE_URL works as expected
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     # Database URL in SQLAlchemy format
     # Example: postgresql+psycopg://user:password@localhost:5432/budget_db
@@ -26,7 +24,7 @@ class Settings(BaseSettings):
     db_echo: bool = True
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Return a cached instance of the application settings."""
     return Settings()

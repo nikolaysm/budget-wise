@@ -10,8 +10,13 @@ on:
 permissions:
   contents: read
 
+env:
+  FRONTEND_DIR: frontend
+
 jobs:
   commitlint:
+    # Skip commitlint for automated version bump commits to save CI time
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,14 +29,18 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10.15.0
+          # Version omitted to avoid duplication; action will read from root package.json packageManager field.
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: '${{ env.FRONTEND_DIR }}/pnpm-lock.yaml'
 
       - name: Install commitlint locally
-        run: pnpm add -D @commitlint/cli@19.5.0 @commitlint/config-conventional@19.5.0
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
 
       - name: Lint commit messages
         shell: bash

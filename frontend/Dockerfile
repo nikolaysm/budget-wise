@@ -14,7 +14,7 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.16.0 --activate
 
 # Install deps (full, because we need dev deps to build)
 COPY package.json pnpm-lock.yaml* ./

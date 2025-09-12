@@ -7,3 +7,7 @@ rules:
   subject-case: [0]
   # Keep default max header length
   header-max-length: [2, 'always', 100]
+  # Allow long body lines (Ruff output, lists) without failing
+  body-max-line-length: [0]
+  # Allow long footer (BREAKING CHANGE details) without failing
+  footer-max-line-length: [0]
