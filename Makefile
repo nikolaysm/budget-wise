@@ -27,6 +27,9 @@ help:
 	@echo "  frontend-build   Build Next.js production bundle"
 	@echo "  frontend-lint    Run ESLint on frontend"
 	@echo "  frontend-typecheck Run TypeScript type check (no emit)"
+	@echo "  lint-backend      Run Ruff lint (no fix)"
+	@echo "  format-backend    Run Ruff format + organize imports"
+	@echo "  lint              Run all linting (backend+frontend)"
 
 $(VENV):
 	@echo "[uv] Creating project venv inside backend and syncing deps"
@@ -110,6 +113,23 @@ frontend-lint: frontend-install
 frontend-typecheck: frontend-install
 	@echo "[frontend] Type checking"
 	cd $(FRONTEND_DIR) && $(PNPM) exec tsc --noEmit --project tsconfig.json
+
+# Backend lint / format using Ruff via uv (no separate install step needed if added to dev deps later)
+.PHONY: lint-backend
+lint-backend: uv-setup
+	@echo "[ruff] Linting backend (no fixes)"
+	[ -f "$$HOME/.local/bin/env" ] && . "$$HOME/.local/bin/env" || true; export PATH="$$HOME/.local/bin:$$PATH"; \
+	cd backend && $(UV) run ruff check app
+
+.PHONY: format-backend
+format-backend: uv-setup
+	@echo "[ruff] Formatting + fixing imports backend"
+	[ -f "$$HOME/.local/bin/env" ] && . "$$HOME/.local/bin/env" || true; export PATH="$$HOME/.local/bin:$$PATH"; \
+	cd backend && $(UV) run ruff format app && $(UV) run ruff check --fix --select I app
+
+.PHONY: lint
+lint: lint-backend frontend-lint
+	@echo "[lint] Completed all lint steps"
 
 .PHONY: run-db
 run-db:

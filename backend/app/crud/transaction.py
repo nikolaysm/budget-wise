@@ -5,8 +5,6 @@ These functions provide a layer of abstraction over the raw SQLModel API,
 encouraging consistent usage patterns and simplifying future refactoring.
 """
 
-from typing import List, Optional
-
 from sqlmodel import Session, select
 
 from app.models.transaction import Transaction
@@ -28,7 +26,7 @@ def create_transaction(db: Session, *, transaction: Transaction) -> Transaction:
     return transaction
 
 
-def get_transaction(db: Session, *, transaction_id: int) -> Optional[Transaction]:
+def get_transaction(db: Session, *, transaction_id: int) -> Transaction | None:
     """Retrieve a single transaction by ID.
 
     Args:
@@ -41,7 +39,7 @@ def get_transaction(db: Session, *, transaction_id: int) -> Optional[Transaction
     return db.get(Transaction, transaction_id)
 
 
-def get_transactions(db: Session, *, skip: int = 0, limit: int = 100) -> List[Transaction]:
+def get_transactions(db: Session, *, offset: int = 0, limit: int = 100) -> list[Transaction]:
     """Return a list of transactions with pagination.
 
     Args:
@@ -52,5 +50,5 @@ def get_transactions(db: Session, *, skip: int = 0, limit: int = 100) -> List[Tr
     Returns:
         List[Transaction]: A list of transactions.
     """
-    statement = select(Transaction).offset(skip).limit(limit)
+    statement = select(Transaction).offset(offset).limit(limit)
     return list(db.exec(statement))

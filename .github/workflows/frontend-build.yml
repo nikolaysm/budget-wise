@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+  # Note: pnpm version is sourced from root or frontend package.json `packageManager`.
+  # Avoid specifying an explicit version here to prevent 'Multiple versions of pnpm specified' errors.
     defaults:
       run:
         working-directory: frontend
@@ -22,10 +24,9 @@ jobs:
           node-version: '20'
           check-latest: false
 
-      - name: Setup pnpm 10.15.0
+      - name: Setup pnpm (derive version from packageManager)
         uses: pnpm/action-setup@v4
         with:
-          version: 10.15.0
           run_install: false
 
       - name: Determine pnpm store path

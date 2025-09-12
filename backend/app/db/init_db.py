@@ -13,8 +13,9 @@ from app.db.session import engine
 def init_db() -> None:
     """Create all tables in the database using SQLModel metadata."""
     # Import models to register them with SQLModel metadata
-    import app.models.user  # noqa: F401
     import app.models.account  # noqa: F401
     import app.models.category  # noqa: F401
     import app.models.transaction  # noqa: F401
+    import app.models.user  # noqa: F401
+
     SQLModel.metadata.create_all(bind=engine)
