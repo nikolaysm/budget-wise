@@ -29,7 +29,9 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_transactions(
-    *, file: UploadFile = File(...), db: Session = Depends(get_db)  # noqa: B008
+    *,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),  # noqa: B008
 ) -> list[Transaction]:
     """Parse the uploaded file and persist each transaction.
 
@@ -109,25 +111,13 @@ async def upload_transactions(
             postal_code_city=str(row["Postcode en plaats"])
             if not pd.isna(row["Postcode en plaats"])
             else None,
-            transaction_type=str(row["Transactie"])
-            if not pd.isna(row["Transactie"])
-            else None,
-            value_date=str(row["Valutadatum"])
-            if not pd.isna(row["Valutadatum"])
-            else None,
+            transaction_type=str(row["Transactie"]) if not pd.isna(row["Transactie"]) else None,
+            value_date=str(row["Valutadatum"]) if not pd.isna(row["Valutadatum"]) else None,
             amount=float(row["Bedrag"]),
-            currency=str(row["Devies"])
-            if not pd.isna(row["Devies"])
-            else None,
-            bic=str(row["BIC"])
-            if not pd.isna(row["BIC"])
-            else None,
-            country_code=str(row["Landcode"])
-            if not pd.isna(row["Landcode"])
-            else None,
-            notes=str(row["Mededelingen"])
-            if not pd.isna(row["Mededelingen"])
-            else None,
+            currency=str(row["Devies"]) if not pd.isna(row["Devies"]) else None,
+            bic=str(row["BIC"]) if not pd.isna(row["BIC"]) else None,
+            country_code=str(row["Landcode"]) if not pd.isna(row["Landcode"]) else None,
+            notes=str(row["Mededelingen"]) if not pd.isna(row["Mededelingen"]) else None,
         )
         saved = create_transaction(db, transaction=transaction)
         transactions.append(saved)
