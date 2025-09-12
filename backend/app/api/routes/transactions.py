@@ -12,7 +12,7 @@ from __future__ import annotations
 import io
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlmodel import Session
 
 from app.api.deps import get_db
@@ -30,7 +30,7 @@ router = APIRouter()
 )
 async def upload_transactions(
     *,
-    file: UploadFile = File(...),
+    file: UploadFile,
     db: Session = Depends(get_db),  # noqa: B008
 ) -> list[Transaction]:
     """Parse the uploaded file and persist each transaction.
