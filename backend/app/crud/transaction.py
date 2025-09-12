@@ -5,7 +5,6 @@ These functions provide a layer of abstraction over the raw SQLModel API,
 encouraging consistent usage patterns and simplifying future refactoring.
 """
 
-
 from sqlmodel import Session, select
 
 from app.models.transaction import Transaction

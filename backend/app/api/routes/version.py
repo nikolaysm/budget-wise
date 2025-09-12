@@ -3,6 +3,7 @@ API router for application metadata endpoints.
 
 Provides a simple `/version` endpoint to retrieve the current API version.
 """
+
 from fastapi import APIRouter
 
 from app.version import get_version
