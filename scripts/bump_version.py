@@ -55,11 +55,12 @@ def write_backend_version(version: str) -> None:
         print("Missing [project] section in backend/pyproject.toml", file=sys.stderr)
         raise SystemExit(2)
     block = sec.group(1)
-    new_block, count = re.subn(
-        r'(?m)^(\s*version\s*=\s*["\'])\d+\.\d+\.\d+(["\'][^\n]*$)',
-        rf"\1{version}\2",
-        block,
-    )
+    # Use a function replacement to avoid back-reference ambiguity (which caused
+    # 'invalid group reference' errors when digits directly followed a numbered group).
+    pattern = r'(?m)^(\s*version\s*=\s*["\'])\d+\.\d+\.\d+(["\'][^\n]*$)'
+    def _repl(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{version}{match.group(2)}"
+    new_block, count = re.subn(pattern, _repl, block)
     if count == 0:
         print('No version key like: version = "X.Y.Z" inside [project]', file=sys.stderr)
         raise SystemExit(2)
