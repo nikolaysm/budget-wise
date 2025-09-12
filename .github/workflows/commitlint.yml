@@ -24,14 +24,16 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: pnpm@10.16.0+sha512.8066e7b034217b700a9a4dbb3a005061d641ba130a89915213a10b3ca4919c19c037bec8066afdc559b89635fdb806b16ea673f2468fbb28aabfa13c53e3f769
+          # Version omitted to avoid duplication; action will read from root package.json packageManager field.
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install commitlint locally
-        run: pnpm add -D @commitlint/cli@19.5.0 @commitlint/config-conventional@19.5.0
+        run: |
+          pnpm install --frozen-lockfile || pnpm install
 
       - name: Lint commit messages
         shell: bash
