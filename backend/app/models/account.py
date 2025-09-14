@@ -7,10 +7,13 @@ extended to include additional metadata such as bank name or IBAN.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship, SQLModel
 
-from .transaction import Transaction
-from .user import User
+if TYPE_CHECKING:
+    from .transaction import Transaction
+    from .user import User
 
 
 class AccountBase(SQLModel):
