@@ -9,9 +9,12 @@ defined via the `transactions` attribute.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship, SQLModel
 
-from .transaction import Transaction
+if TYPE_CHECKING:
+    from .transaction import Transaction
 
 
 class CategoryBase(SQLModel):
