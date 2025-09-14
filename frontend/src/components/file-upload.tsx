@@ -60,7 +60,7 @@ const FileUpload: React.FC = () => {
         >
         <div className="flex w-full justify-end">
           <Button
-            className="cursor-pointer"
+            className={!file || isUploading ? "hidden" : "cursor-pointer"}
             type="button"
             variant="ghost"
             onClick={() => setFile(null)}

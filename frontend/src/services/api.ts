@@ -48,14 +48,14 @@ export async function uploadTransactions(file: File): Promise<Transaction[]> {
 /**
  * Fetch a paginated list of transactions.
  *
- * @param skip - How many records to skip.
+ * @param offset - How many records to offset.
  * @param limit - Maximum number of records to fetch.
  * @returns A promise resolving to an array of `Transaction` objects.
  */
-export async function listTransactions(skip = 0, limit = 100): Promise<Transaction[]> {
+export async function listTransactions(offset = 0, limit = 100): Promise<Transaction[]> {
   const response = await axios.get<Transaction[]>('/transactions', {
     baseURL: API_BASE_URL,
-    params: { skip, limit },
+    params: { offset, limit },
   });
   return response.data;
 }
