@@ -8,10 +8,13 @@ key `id` is an auto‑incrementing integer.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlmodel import Field, Relationship, SQLModel
 
-from .account import Account
-from .category import Category
+if TYPE_CHECKING:
+    from .account import Account
+    from .category import Category
 
 
 class TransactionBase(SQLModel):
