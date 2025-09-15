@@ -6,10 +6,16 @@ initializes the database on startup. It is separated into its own file
 to avoid circular imports and to allow the `app` instance to be
 """
 
+import logging.config
+
 from fastapi import FastAPI
 
 from app.api.routes import transactions_router, version_router
+from app.core.config import LOGGER_CONFIG
 from app.version import get_version
+
+# Set logging configuration
+logging.config.dictConfig(LOGGER_CONFIG)
 
 
 def create_app() -> FastAPI:

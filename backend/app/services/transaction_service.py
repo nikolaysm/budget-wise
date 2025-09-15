@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import io
 import logging
-from dataclasses import dataclass
-from typing import Any
 
 import pandas as pd
 from sqlmodel import Session
 
+from app.core.config import get_settings
+from app.daos.account_dao import AccountDAO
 from app.daos.transaction_dao import TransactionDAO
-from app.models.transaction import Transaction
+from app.models.account import Account
+from app.models.transaction import Transaction, TransactionIn
+
+logger = logging.getLogger(get_settings().app_logger_name)
 
 EXPECTED_COLUMNS = [
     "Rekening",
@@ -32,52 +35,13 @@ EXPECTED_COLUMNS = [
 ]
 
 
-@dataclass(slots=True)
-class ParsedTransaction:
-    """Lightweight representation before persistence (helps future validation)."""
-
-    account: str
-    booking_date: str | None
-    statement_number: str | None
-    transaction_number: str | None
-    counterparty_account: str | None
-    counterparty_name: str | None
-    street_number: str | None
-    postal_code_city: str | None
-    transaction_type: str | None
-    value_date: str | None
-    amount: float
-    currency: str | None
-    bic: str | None
-    country_code: str | None
-    notes: str | None
-
-    def to_model(self) -> Transaction:  # noqa: D401 - self explanatory
-        return Transaction(
-            account=self.account,
-            booking_date=self.booking_date,
-            statement_number=self.statement_number,
-            transaction_number=self.transaction_number,
-            counterparty_account=self.counterparty_account,
-            counterparty_name=self.counterparty_name,
-            street_number=self.street_number,
-            postal_code_city=self.postal_code_city,
-            transaction_type=self.transaction_type,
-            value_date=self.value_date,
-            amount=self.amount,
-            currency=self.currency,
-            bic=self.bic,
-            country_code=self.country_code,
-            notes=self.notes,
-        )
-
-
 class TransactionService:
     """High-level operations for transactions."""
 
-    def __init__(self, dao: TransactionDAO, session: Session):  # session kept for future needs
+    def __init__(self, dao: TransactionDAO, account_dao: AccountDAO, session: Session):  # session kept for future needs
         self.dao = dao
         self.session = session
+        self.account_dao = account_dao
 
     # --- Public API -----------------------------------------------------------
     def list(self, *, offset: int = 0, limit: int = 100) -> list[Transaction]:
@@ -87,13 +51,75 @@ class TransactionService:
         return self.dao.get(tx_id)
 
     def ingest_file(self, *, filename: str, data: bytes) -> list[Transaction]:
-        df = self._read_file(filename=filename, data=data)
+        """Parse the uploaded file and persist each transaction."""
+        table_data = self._extract_single_table(data)
+        df = self._read_file(filename=filename, data=table_data)
         self._validate_columns(df)
-        parsed = [self._row_to_parsed(row) for _, row in df.iterrows()]
-        models = (p.to_model() for p in parsed)
+        # Ensure Account rows exist for each unique account number prior to transaction insertion
+        account_map: dict[str, Account] = {}
+        for acc_number_obj in df["Rekening"].unique():  # type: ignore[index]
+            if acc_number_obj is None:
+                continue
+            acc_number = str(acc_number_obj)
+            account_map[acc_number] = self.account_dao.get_or_create(number=acc_number)
+
+        models = (self._row_to_parsed(row, account_map) for _, row in df.iterrows())
         return self.dao.bulk_create(models)
 
     # --- Internal helpers -----------------------------------------------------
+    def _extract_single_table(self, raw: bytes) -> bytes:
+        """
+        Try to keep only the first (main) table from a CSV export that may contain
+        multiple tables separated by a separator pattern like:
+
+            \r\n;\r\n
+            \n;\n
+            (optionally followed by extra blank lines)
+
+        The pattern corresponds to a line containing only a single ';'
+        (all-empty columns) often used as a visual spacer between exported tables.
+
+        Returns the (possibly) truncated bytes. Falls back to original on errors.
+        """
+        try:
+            text = raw.decode("utf-8-sig", errors="replace")
+        except Exception:  # pragma: no cover - very unlikely
+            logging.debug("Failed to decode raw bytes, returning original")
+            return raw
+
+        # Candidate separator patterns ordered by specificity (longest first)
+        patterns = [
+            "\r\n;\r\n\r\n",
+            "\r\n;\r\n",
+            "\n;\n\n",
+            "\n;\n",
+        ]
+
+        cut_idx = None
+        matched_pat = None
+        for pat in patterns:
+            idx = text.find(pat)
+            if idx != -1:
+                cut_idx = idx
+                matched_pat = pat
+                break
+
+        if cut_idx is None or matched_pat is None:
+            return raw  # nothing to do
+        # Return the part AFTER the first separator pattern instead of before it
+        start_idx = cut_idx + len(matched_pat)
+        second_part = text[start_idx:].lstrip("\r\n")
+        # Ensure it ends with a newline for CSV parsers
+        if not second_part.endswith("\n"):
+            second_part += "\n"
+        truncated = second_part
+        logging.debug(
+            "CSV truncated at separator pattern; original=%d bytes, truncated=%d bytes",
+            len(raw),
+            len(truncated.encode("utf-8")),
+        )
+        return truncated.encode("utf-8")
+
     def _read_file(self, *, filename: str, data: bytes) -> pd.DataFrame:
         if filename.endswith(".csv"):
             return pd.read_csv(io.BytesIO(data), sep=";")
@@ -106,45 +132,14 @@ class TransactionService:
         if missing:
             raise ValueError(f"Missing expected columns: {missing}")
 
-    @staticmethod
-    def _val(value: Any):  # noqa: ANN001 - small internal helper
-        import pandas as _pd  # local import to avoid polluting global namespace
+    def _row_to_parsed(self, row: pd.Series, account_map: dict[str, Account]) -> Transaction:
+        """Parse a dataframe row into a validated Transaction instance (for DAO.bulk_create).
 
-        if value is None:
-            return None
-        try:
-            if _pd.isna(value):  # type: ignore[arg-type]
-                return None
-        except Exception:  # pragma: no cover - defensive
-            logging.debug("_val: isna check failed for value %r", value)
-        return value
-
-    def _row_to_parsed(self, row) -> ParsedTransaction:  # noqa: ANN001 - pandas row
-        v = self._val
-        return ParsedTransaction(
-            account=str(v(row["Rekening"])) if v(row["Rekening"]) is not None else "",  # required
-            booking_date=str(v(row["Boekingsdatum"])) if v(row["Boekingsdatum"]) else None,
-            statement_number=str(v(row["Rekeninguittrekselnummer"]))
-            if v(row["Rekeninguittrekselnummer"])
-            else None,
-            transaction_number=str(v(row["Transactienummer"]))
-            if v(row["Transactienummer"])
-            else None,
-            counterparty_account=str(v(row["Rekening tegenpartij"]))
-            if v(row["Rekening tegenpartij"])
-            else None,
-            counterparty_name=str(v(row["Naam tegenpartij bevat"]))
-            if v(row["Naam tegenpartij bevat"])
-            else None,
-            street_number=str(v(row["Straat en nummer"])) if v(row["Straat en nummer"]) else None,
-            postal_code_city=str(v(row["Postcode en plaats"]))
-            if v(row["Postcode en plaats"])
-            else None,
-            transaction_type=str(v(row["Transactie"])) if v(row["Transactie"]) else None,
-            value_date=str(v(row["Valutadatum"])) if v(row["Valutadatum"]) else None,
-            amount=float(v(row["Bedrag"]) or 0.0),
-            currency=str(v(row["Devies"])) if v(row["Devies"]) else None,
-            bic=str(v(row["BIC"])) if v(row["BIC"]) else None,
-            country_code=str(v(row["Landcode"])) if v(row["Landcode"]) else None,
-            notes=str(v(row["Mededelingen"])) if v(row["Mededelingen"]) else None,
-        )
+        Injects the resolved `account_id` based on the account number.
+        """
+        transaction_in = TransactionIn(**row.to_dict())
+        account = account_map.get(transaction_in.account)
+        if account is None:
+            raise ValueError(f"Account not found for number: {transaction_in.account}")
+        transaction_in.account_id = account.id
+        return Transaction.model_validate(transaction_in)

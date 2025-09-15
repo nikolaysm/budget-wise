@@ -1,4 +1,5 @@
-from .base import BaseDAO  # noqa: F401
-from .transaction_dao import TransactionDAO  # noqa: F401
+from .account_dao import AccountDAO
+from .base import BaseDAO
+from .transaction_dao import TransactionDAO
 
-__all__ = ["BaseDAO", "TransactionDAO"]
+__all__ = ["BaseDAO", "TransactionDAO", "AccountDAO"]

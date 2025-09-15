@@ -9,11 +9,16 @@ transactions and retrieval by ID.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.api.deps import get_transaction_service
+from app.core.config import get_settings
 from app.models.transaction import Transaction
 from app.services.transaction_service import TransactionService
+
+logger = logging.getLogger(get_settings().app_logger_name)
 
 router = APIRouter()
 
@@ -49,6 +54,7 @@ async def upload_transactions(
     try:
         return service.ingest_file(filename=filename, data=contents)
     except Exception as e:  # broad to convert into HTTP error
+        logger.error("Error processing uploaded file %s: %s", filename, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error processing upload: {e}",

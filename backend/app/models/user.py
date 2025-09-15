@@ -9,9 +9,13 @@ plaintext passwords.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
-from .account import Account
+if TYPE_CHECKING:
+    from .account import Account
 
 
 class UserBase(SQLModel):
@@ -28,4 +32,5 @@ class User(UserBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     hashed_password: str
     # One-to-many relationship: a user can have multiple accounts
-    accounts: list[Account] = Relationship(back_populates="user")
+    accounts: Mapped[list[Account]] = Relationship(
+        sa_relationship=relationship(back_populates="user"))

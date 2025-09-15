@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -28,4 +29,6 @@ class Category(CategoryBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     # Establish one‑to‑many relationship with Transaction
-    transactions: list[Transaction] = Relationship(back_populates="category")
+    transactions: Mapped[list[Transaction]] = Relationship(
+        sa_relationship=relationship(back_populates="transactions")
+    )

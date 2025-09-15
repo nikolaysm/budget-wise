@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ class Account(AccountBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="user.id")
     # Relationships
-    user: User | None = Relationship(back_populates="accounts")
+    user: Mapped[User | None] = Relationship(sa_relationship=relationship(back_populates="accounts"))
     # A one-to-many relationship to `Transaction`. The corresponding attribute on
     # Transaction is `account_ref` to avoid name clashes with the raw `account` field.
-    transactions: list[Transaction] = Relationship(back_populates="account_ref")
+    transactions: Mapped[list[Transaction]] = Relationship(sa_relationship=relationship(back_populates="account_ref"))
