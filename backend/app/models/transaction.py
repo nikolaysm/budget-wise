@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import ValidatorFunctionWrapHandler, field_validator
+from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -21,7 +23,7 @@ class TransactionBase(SQLModel):
     """Shared attributes for transactions that can be inherited by other models."""
 
     # Raw account number to which this transaction belongs ("Rekening").
-    account: str
+    account: str = Field(schema_extra={"validation_alias": "Rekening"})
     # Original booking date ("Boekingsdatum"). Could be converted to date.
     booking_date: str | None = None
     # Statement number ("Rekeninguittrekselnummer").
@@ -41,7 +43,7 @@ class TransactionBase(SQLModel):
     # Value date ("Valutadatum"). Could be converted to date.
     value_date: str | None = None
     # Amount ("Bedrag"). Negative values represent expenses.
-    amount: float
+    amount: float = Field(schema_extra={"validation_alias": "Bedrag"})
     # Currency code ("Devies").
     currency: str | None = None
     # BIC code of the counterparty ("BIC").
@@ -62,8 +64,23 @@ class Transaction(TransactionBase, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     # Relationship to Category. The annotation string prevents circular import issues.
-    category: Category | None = Relationship(back_populates="transactions")
+    category: Mapped[Category | None] = Relationship(
+        sa_relationship=relationship(back_populates="transactions"))
     # Relationship to Account. Allows navigating from a transaction to its account. The attribute
     # name `account_ref" is used instead of `account` to avoid clashing with the `account`
     # column defined in `TransactionBase`.
-    account_ref: Account | None = Relationship(back_populates="transactions")
+    account_ref: Mapped[Account | None] = Relationship(
+        sa_relationship=relationship(back_populates="transactions"))
+
+
+class TransactionIn(TransactionBase):
+
+    @field_validator("amount", mode="wrap")
+    @classmethod
+    def comma_to_dot(cls, value: str, handler: ValidatorFunctionWrapHandler) -> float:
+        value = value.replace(",", ".")
+        return handler(value)
+
+
+class TransactionOut(TransactionBase):
+    id: int
