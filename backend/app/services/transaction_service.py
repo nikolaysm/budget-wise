@@ -6,6 +6,7 @@ import io
 import logging
 
 import pandas as pd
+from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.core.config import get_settings
@@ -38,7 +39,9 @@ EXPECTED_COLUMNS = [
 class TransactionService:
     """High-level operations for transactions."""
 
-    def __init__(self, dao: TransactionDAO, account_dao: AccountDAO, session: Session):  # session kept for future needs
+    def __init__(
+        self, dao: TransactionDAO, account_dao: AccountDAO, session: Session
+    ):  # session kept for future needs
         self.dao = dao
         self.session = session
         self.account_dao = account_dao
@@ -46,6 +49,9 @@ class TransactionService:
     # --- Public API -----------------------------------------------------------
     def list(self, *, offset: int = 0, limit: int = 100) -> list[Transaction]:
         return self.dao.list(offset=offset, limit=limit)
+
+    def list_and_count(self, *, offset: int = 0, limit: int = 100) -> tuple[list[Transaction], int]:
+        return self.dao.list_and_count(offset=offset, limit=limit)
 
     def get(self, tx_id: int) -> Transaction | None:
         return self.dao.get(tx_id)
@@ -142,4 +148,9 @@ class TransactionService:
         if account is None:
             raise ValueError(f"Account not found for number: {transaction_in.account}")
         transaction_in.account_id = account.id
-        return Transaction.model_validate(transaction_in)
+        try:
+            return Transaction.model_validate(transaction_in)
+        except ValidationError as exc:
+            print(repr(exc.errors()[0]["type"]))
+            logger.error("Failed to validate transaction row: %s", exc, exc_info=True)
+            raise

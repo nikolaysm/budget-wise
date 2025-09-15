@@ -1,0 +1,18 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run backend (uvicorn via uv)",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"run-backend"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$pylint"
+			],
+			"group": "build"
+		}
+	]
+}
