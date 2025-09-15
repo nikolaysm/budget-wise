@@ -10,12 +10,14 @@ transactions and retrieval by ID.
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 
 from app.api.deps import get_transaction_service
 from app.core.config import get_settings
 from app.models.transaction import Transaction
+from app.schemas.pagination import PaginationIn, PaginationOut
 from app.services.transaction_service import TransactionService
 
 logger = logging.getLogger(get_settings().app_logger_name)
@@ -32,7 +34,7 @@ router = APIRouter()
 async def upload_transactions(
     *,
     file: UploadFile,
-    service: TransactionService = Depends(get_transaction_service),  # noqa: B008
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
 ) -> list[Transaction]:
     """Parse the uploaded file and persist each transaction.
 
@@ -63,26 +65,26 @@ async def upload_transactions(
 
 @router.get(
     "/",
-    response_model=list[Transaction],
-    summary="List transactions",
+    response_model=PaginationOut[Transaction],  # type: ignore[index]
+    summary="List transactions (paginated)",
 )
 def list_transactions(
     *,
-    offset: int = 0,
-    limit: int = 100,
-    service: TransactionService = Depends(get_transaction_service),  # noqa: B008
-) -> list[Transaction]:
-    """Retrieve a paginated list of transactions.
-
-    Args:
-        offset (int, optional): Number of records to offset. Defaults to 0.
-        limit (int, optional): Maximum number of records to return. Defaults to 100.
-        db (Session): Database session dependency.
-
-    Returns:
-        List[Transaction]: A list of transactions.
-    """
-    return service.list(offset=offset, limit=limit)
+    params: PaginationIn = Depends(),  # offset & limit validated via model
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
+) -> PaginationOut[Transaction]:
+    """Retrieve a paginated list of transactions wrapped in a pagination envelope."""
+    # Fetch one extra to know if we have a next page
+    rows, total = service.list_and_count(offset=params.offset, limit=params.limit + 1)
+    items = rows[: params.limit]
+    has_more = len(rows) > params.limit
+    return PaginationOut[Transaction](  # type: ignore[call-arg]
+        items=items,
+        offset=params.offset,
+        limit=params.limit,
+        has_more=has_more,
+        total=total,
+    )
 
 
 @router.get(
@@ -93,7 +95,7 @@ def list_transactions(
 def read_transaction(
     *,
     transaction_id: int,
-    service: TransactionService = Depends(get_transaction_service),  # noqa: B008
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
 ) -> Transaction:
     """Retrieve a single transaction by its primary key.
 

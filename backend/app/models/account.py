@@ -7,7 +7,9 @@ extended to include additional metadata such as bank name or IBAN.
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
@@ -29,10 +31,14 @@ class AccountBase(SQLModel):
 class Account(AccountBase, table=True):
     """Database model representing a bank account."""
 
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int | None = Field(default=None, foreign_key="user.id")
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: UUID | None = Field(default=None, foreign_key="user.id")
     # Relationships
-    user: Mapped[User | None] = Relationship(sa_relationship=relationship(back_populates="accounts"))
+    user: Mapped[User | None] = Relationship(
+        sa_relationship=relationship(back_populates="accounts")
+    )
     # A one-to-many relationship to `Transaction`. The corresponding attribute on
     # Transaction is `account_ref` to avoid name clashes with the raw `account` field.
-    transactions: Mapped[list[Transaction]] = Relationship(sa_relationship=relationship(back_populates="account_ref"))
+    transactions: Mapped[list[Transaction]] = Relationship(
+        sa_relationship=relationship(back_populates="account_ref")
+    )

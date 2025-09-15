@@ -9,7 +9,9 @@ defined via the `transactions` attribute.
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship, SQLModel
@@ -27,8 +29,8 @@ class CategoryBase(SQLModel):
 class Category(CategoryBase, table=True):
     """Database model for a transaction category."""
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     # Establish one‑to‑many relationship with Transaction
     transactions: Mapped[list[Transaction]] = Relationship(
-        sa_relationship=relationship(back_populates="transactions")
+        sa_relationship=relationship(back_populates="category")
     )

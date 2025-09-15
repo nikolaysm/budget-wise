@@ -28,10 +28,13 @@ dev-dependencies = [
 target-version = "py311"
 line-length = 100
 indent-width = 4
+extend-exclude = ["tests", "alembic/versions/*"]
 
 [tool.ruff.lint]
 # Add W292 (no newline at end of file) by including the "W" (pycodestyle warnings) class.
-select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4"]
+# FURB - refurb > https://docs.astral.sh/ruff/rules/#refurb-furb
+
+select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4", "FURB"]
 ignore = ["E203", "E501"]
 
 # [tool.ruff.lint.per-file-ignores]
@@ -42,7 +45,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
-docstring-code-line-length = 20
+docstring-code-line-length = 60
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
