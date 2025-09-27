@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import logging
 
+import numpy as np
 import pandas as pd
 from pydantic import ValidationError
 from sqlmodel import Session
@@ -47,19 +48,38 @@ class TransactionService:
         self.account_dao = account_dao
 
     # --- Public API -----------------------------------------------------------
-    def list(self, *, offset: int = 0, limit: int = 100) -> list[Transaction]:
-        return self.dao.list(offset=offset, limit=limit)
+    def list(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> list[Transaction]:
+        return self.dao.list(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
 
-    def list_and_count(self, *, offset: int = 0, limit: int = 100) -> tuple[list[Transaction], int]:
-        return self.dao.list_and_count(offset=offset, limit=limit)
+    def list_and_count(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[Transaction], int]:
+        return self.dao.list_and_count(
+            offset=offset,
+            limit=limit,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
 
-    def get(self, tx_id: int) -> Transaction | None:
+    def get(self, tx_id) -> Transaction | None:  # accepts UUID string
         return self.dao.get(tx_id)
 
     def ingest_file(self, *, filename: str, data: bytes) -> list[Transaction]:
         """Parse the uploaded file and persist each transaction."""
         table_data = self._extract_single_table(data)
-        df = self._read_file(filename=filename, data=table_data)
+        df = self._read_file(filename=filename, data=table_data).replace({np.nan: None})
         self._validate_columns(df)
         # Ensure Account rows exist for each unique account number prior to transaction insertion
         account_map: dict[str, Account] = {}
@@ -71,6 +91,20 @@ class TransactionService:
 
         models = (self._row_to_parsed(row, account_map) for _, row in df.iterrows())
         return self.dao.bulk_create(models)
+
+    def set_transaction_number(self, tx_id: str, number: int) -> Transaction:
+        """Assign a transaction_number to an existing transaction.
+
+        Raises ValueError if transaction not found.
+        """
+        updated = self.dao.set_transaction_number(tx_id, number)
+        if not updated:
+            raise ValueError("Transaction not found")
+        # Re-fetch to return with relationships if needed
+        tx = self.get(tx_id)
+        if tx is None:  # pragma: no cover - defensive, should not happen
+            raise ValueError("Transaction not found after update")
+        return tx
 
     # --- Internal helpers -----------------------------------------------------
     def _extract_single_table(self, raw: bytes) -> bytes:

@@ -6,7 +6,7 @@ that carries items plus navigation links (next / previous) and optional total co
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -20,6 +20,12 @@ class PaginationIn(BaseModel):
         0, ge=0, description="Number of items to skip before starting to collect the result set"
     )
     limit: int = Field(100, ge=1, le=500, description="Maximum number of items to return")
+    sort_by: Literal["booking_date", "amount", "account", "transaction_number"] | None = Field(
+        None, description="Optional field name to sort by"
+    )
+    sort_dir: Literal["asc", "desc"] | None = Field(
+        None, description="Sort direction for sort_by (asc/desc)"
+    )
 
 
 class PaginationOut(BaseModel, Generic[T]):

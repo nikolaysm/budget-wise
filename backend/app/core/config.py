@@ -7,7 +7,7 @@ function to retrieve the settings with caching to avoid re‑parsing the
 environment on each call.
 """
 
-from functools import lru_cache
+from functools import lru_cache  # noqa: I001
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # Example: postgresql+psycopg://user:password@localhost:5432/budget_db
     database_url: str = "sqlite:///./budget_wise.db"
     db_echo: bool = True
+    allowed_origins: list[str] = []  # e.g. ["http://localhost:3000"]
 
 
 @lru_cache

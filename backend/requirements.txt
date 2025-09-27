@@ -11,3 +11,4 @@ psycopg[binary]
 # Pydantic v2 and settings helper
 pydantic>=2
 pydantic-settings>=2
+python-slugify>=8.0.0

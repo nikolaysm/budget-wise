@@ -24,25 +24,43 @@ class BaseDAO(Generic[T]):
     def __init__(self, session: Session):
         self.session = session
 
+    @property
     def _pk_name(self) -> Any:
         """Return the name of the primary key field for the model."""
         return inspect(self.model).primary_key[0].name
 
     def _default_order_by(self) -> Any:
-        """Return default ordering for list() queries.
+        """Default ORDER BY: primary key column (not its name)."""
+        return self._pk_name
 
-        Overridable in subclasses. Return one of:
-        - a single column/expression (e.g., Model.id)
-        - a tuple/list of columns/expressions (e.g., (desc(Model.date), Model.id))
-        - None to apply no default ordering
-        """
-        return inspect(self.model).primary_key[0].name
-
-    def get_queryset(self, *, offset: int = 0, limit: int = 100) -> SelectOfScalar[T]:
-        stmt = select(self.model)
-        order_by = self._default_order_by()
-        if order_by is not None:
-            stmt = stmt.order_by(order_by)
+    def get_queryset(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        extra_columns: list[Any] | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> SelectOfScalar[T]:
+        """Return a base query for listing objects, with optional pagination."""
+        # columns can be additional selected expressions (e.g., count)
+        columns = extra_columns or []
+        stmt = select(self.model, *columns)
+        # Determine ordering
+        order_expr = None
+        if sort_by:
+            # Validate attribute exists
+            if hasattr(self.model, sort_by):
+                order_expr = getattr(self.model, sort_by)
+                if sort_dir == "desc":  # default asc
+                    order_expr = order_expr.desc()
+            else:
+                # Fallback to default order when invalid field supplied
+                order_expr = self._default_order_by()
+        else:
+            order_expr = self._default_order_by()
+        if order_expr is not None:
+            stmt = stmt.order_by(order_expr)
         if offset:
             stmt = stmt.offset(offset)
         if limit:
@@ -74,20 +92,60 @@ class BaseDAO(Generic[T]):
     def get(self, obj_id: Any) -> T | None:
         return self.session.get(self.model, obj_id)
 
-    def list(self, *, offset: int = 0, limit: int = 100) -> list[T]:
-        stmt = self.get_queryset(offset=offset, limit=limit)
+    def list(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> list[T]:
+        stmt = self.get_queryset(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
         return list(self.session.exec(stmt))
 
-    def list_and_count(self, *, offset: int = 0, limit: int = 100) -> tuple[list[T], int]:
-        stmt = self.get_queryset(offset=offset, limit=limit)
-        stmt = stmt.add_columns(func.count(self._pk_name).over().label("total"))
-        rows = self.session.exec(stmt)  # type: ignore[arg-type]
-        import pdb
+    # def list_and_count(self, *, offset: int = 0, limit: int = 100) -> tuple[list[T], int]:
+    #     total_col = func.count().over().label("_total_count")
 
-        pdb.set_trace()
-        count = 0
-        for row in rows:
-            count = row.total  # type: ignore[attr-defined]
-            break
+    #     # build a non-scalar select (model + count)
+    #     stmt = select(self.model, total_col)
+    #     order_by = self._default_order_by()
+    #     if order_by is not None:
+    #         stmt = stmt.order_by(order_by)
+    #     if offset:
+    #         stmt = stmt.offset(offset)
+    #     if limit:
+    #         stmt = stmt.limit(limit)
 
-        return rows, count
+    #     # fetch as tuples -> list[tuple[T, int]]
+    #     rows = self.session.exec(stmt).all()
+    #     if not rows:
+    #         return [], 0
+    #     import pdb
+
+    #     pdb.set_trace()
+    #     items = [row[0] for row in rows]  # model instances
+    #     total = int(rows[0][1])  # same total on every row
+    #     return items, total
+
+    def list_and_count(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+    ) -> tuple[list[T], int]:
+        total_col = func.count().over().label("_total_count")
+        stmt = self.get_queryset(
+            offset=offset,
+            limit=limit,
+            extra_columns=[total_col],
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+        )
+        rows = self.session.exec(stmt).all()
+        if not rows:
+            return [], 0
+        total = int(rows[0][1])  # type: ignore[index]
+        items = [row[0] for row in rows]  # type: ignore[index]
+        return items, total
