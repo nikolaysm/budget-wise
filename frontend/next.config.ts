@@ -11,7 +11,13 @@ const nextConfig = {
     // Use fallback rewrites so Next's own API routes under pages/api take precedence
     return {
       beforeFiles: [],
-      afterFiles: [],
+      afterFiles: [
+        // Normalize missing trailing slash for transactions list to avoid backend 307 redirect
+        {
+          source: '/api/transactions',
+          destination: `${API_BASE_URL}/transactions/`,
+        },
+      ],
       fallback: [
         {
           source: '/api/:path*',

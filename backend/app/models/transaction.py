@@ -9,12 +9,13 @@ key `id` is an auto‑incrementing integer.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import AliasChoices, ValidatorFunctionWrapHandler, field_validator
 from sqlalchemy.orm import Mapped, relationship
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Date, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .account import Account
@@ -27,19 +28,20 @@ class TransactionBase(SQLModel):
     # Raw account number to which this transaction belongs ("Rekening").
     account: str = Field(schema_extra={"validation_alias": AliasChoices("Rekening", "account")})
     # Original booking date ("Boekingsdatum"). Could be converted to date.
-    booking_date: str | None = Field(
+    booking_date: date | None = Field(
         default=None,
+        sa_type=Date,
         schema_extra={"validation_alias": AliasChoices("Boekingsdatum", "booking_date")},
     )
     # Statement number ("Rekeninguittrekselnummer").
-    statement_number: str | None = Field(
+    statement_number: int | None = Field(
         default=None,
         schema_extra={
             "validation_alias": AliasChoices("Rekeninguittrekselnummer", "statement_number")
         },
     )
     # Unique transaction number ("Transactienummer").
-    transaction_number: str | None = Field(
+    transaction_number: int | None = Field(
         default=None,
         schema_extra={"validation_alias": AliasChoices("Transactienummer", "transaction_number")},
     )
@@ -129,4 +131,6 @@ class TransactionIn(TransactionBase):
 
 
 class TransactionOut(TransactionBase):
-    id: int
+    id: UUID
+    # Expose category name directly for frontend convenience
+    category: str | None = None
