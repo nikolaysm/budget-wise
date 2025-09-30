@@ -29,6 +29,9 @@ export interface Transaction {
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
+  expanded_phrase?: string | null;
+  aliases?: string[];
 }
 
 export async function listCategories(): Promise<Category[]> {
@@ -36,13 +39,19 @@ export async function listCategories(): Promise<Category[]> {
   return response.data;
 }
 
-export async function createCategory(name: string): Promise<Category> {
-  const response = await axios.post<Category>('/categories/', { name }, { baseURL: API_BASE_URL });
+export interface CategoryInput {
+  name: string;
+  expanded_phrase?: string | null;
+  aliases?: string[];
+}
+
+export async function createCategory(input: CategoryInput): Promise<Category> {
+  const response = await axios.post<Category>('/categories/', input, { baseURL: API_BASE_URL });
   return response.data;
 }
 
-export async function renameCategory(id: string, name: string): Promise<Category> {
-  const response = await axios.put<Category>(`/categories/${id}`, { name }, { baseURL: API_BASE_URL });
+export async function updateCategoryApi(id: string, input: Partial<CategoryInput>): Promise<Category> {
+  const response = await axios.put<Category>(`/categories/${id}`, input, { baseURL: API_BASE_URL });
   return response.data;
 }
 

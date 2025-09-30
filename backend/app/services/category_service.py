@@ -32,11 +32,33 @@ class CategoryService:
     def get_by_name(self, name: str) -> Category | None:  # noqa: D401
         return self.category_dao.get_by_name(name)
 
-    def create(self, name: str) -> Category:
-        return self.category_dao.create_unique(name)
+    def create(
+        self,
+        name: str,
+        *,
+        expanded_phrase: str | None = None,
+        aliases: list[str] | None = None,
+    ) -> Category:
+        return self.category_dao.create_full(
+            name=name, expanded_phrase=expanded_phrase, aliases=aliases or []
+        )
 
     def rename(self, category_id, new_name: str) -> Category:
         cat = self.category_dao.rename(category_id, new_name)
+        if not cat:
+            raise ValueError("Category not found")
+        return cat
+
+    def update(
+        self,
+        category_id,
+        *,
+        expanded_phrase: str | None = None,
+        aliases: list[str] | None = None,
+    ) -> Category:
+        cat = self.category_dao.update_fields(
+            category_id, expanded_phrase=expanded_phrase, aliases=aliases
+        )
         if not cat:
             raise ValueError("Category not found")
         return cat

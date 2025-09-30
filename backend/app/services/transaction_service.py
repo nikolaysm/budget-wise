@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import logging
+import re
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
@@ -12,9 +14,11 @@ from sqlmodel import Session
 
 from app.core.config import get_settings
 from app.daos.account_dao import AccountDAO
+from app.daos.category_dao import CategoryDAO
 from app.daos.transaction_dao import TransactionDAO
 from app.models.account import Account
 from app.models.transaction import Transaction, TransactionIn
+from app.services.ai_service import AIInferenceService
 
 logger = logging.getLogger(get_settings().app_logger_name)
 
@@ -40,12 +44,60 @@ EXPECTED_COLUMNS = [
 class TransactionService:
     """High-level operations for transactions."""
 
+    to_strip: list[str] = ["smirnov", "olga", "nikolay", "viktoria", "alexander"]
+    _NAME_STRIP_RE: re.Pattern[str] | None = None  # lazy-compiled regex for name removal
+
+    @classmethod
+    def _get_name_strip_re(cls) -> re.Pattern[str]:
+        if cls._NAME_STRIP_RE is None:
+            cls._NAME_STRIP_RE = re.compile(
+                r"\b(" + "|".join(re.escape(n) for n in cls.to_strip) + r")\b", re.IGNORECASE
+            )
+        return cls._NAME_STRIP_RE
+
     def __init__(
-        self, dao: TransactionDAO, account_dao: AccountDAO, session: Session
-    ):  # session kept for future needs
+        self,
+        dao: TransactionDAO,
+        account_dao: AccountDAO,
+        category_dao: CategoryDAO,
+        session: Session,
+        classifier: AIInferenceService | None = None,
+    ):
         self.dao = dao
         self.session = session
         self.account_dao = account_dao
+        self.category_dao = category_dao
+        self.classifier = classifier or AIInferenceService()
+
+    # --- Cached data --------------------------------------------------------
+    @cached_property
+    def _category_labels(self) -> list[str]:  # pragma: no cover - trivial accessor
+        """Cached flattened label surface used for ML classification.
+
+        Combines category.name, expanded_phrase (if present), and aliases while
+        preserving order of categories and stable uniqueness. This ensures the
+        ML model sees the broader semantic surface without exploding duplicates.
+
+        NOTE: Process-lifetime cache; call `refresh_category_cache()` after any
+        create/update/delete that changes names/phrases/aliases.
+        """
+        labels: list[str] = []
+        seen: set[str] = set()
+        for c in self.category_dao.list(limit=500):
+            for candidate in [c.name, getattr(c, "expanded_phrase", None)]:
+                if candidate and candidate not in seen:
+                    seen.add(candidate)
+                    labels.append(candidate)
+            # aliases is list[str]
+            for a in getattr(c, "aliases", []) or []:
+                if a and a not in seen:
+                    seen.add(a)
+                    labels.append(a)
+        return labels
+
+    def refresh_category_cache(self) -> None:
+        """Invalidate cached category labels so next access re-queries DB."""
+        self.__dict__.pop("_category_labels", None)
 
     # --- Public API -----------------------------------------------------------
     def list(
@@ -55,8 +107,18 @@ class TransactionService:
         limit: int = 100,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        category: str | None = None,
+        exclude_null_category: bool = False,
     ) -> list[Transaction]:
-        return self.dao.list(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
+        items = self.dao.list(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
+        if exclude_null_category:
+            items = [t for t in items if t.category_id is not None]
+        if category:
+            cat = self.category_dao.get_by_name(category)
+            if not cat:
+                return []
+            items = [t for t in items if t.category_id == cat.id]
+        return items
 
     def list_and_count(
         self,
@@ -65,13 +127,25 @@ class TransactionService:
         limit: int = 100,
         sort_by: str | None = None,
         sort_dir: str | None = None,
+        category: str | None = None,
+        exclude_null_category: bool = False,
     ) -> tuple[list[Transaction], int]:
-        return self.dao.list_and_count(
+        items, total = self.dao.list_and_count(
             offset=offset,
             limit=limit,
             sort_by=sort_by,
             sort_dir=sort_dir,
         )
+        # Apply filters in-memory (note: total refers to pre-filter count)
+        if exclude_null_category:
+            items = [t for t in items if t.category_id is not None]
+        if category:
+            cat = self.category_dao.get_by_name(category)
+            if not cat:
+                return [], 0
+            items = [t for t in items if t.category_id == cat.id]
+        # Adjust total to filtered size for caller expectation
+        return items, len(items)
 
     def get(self, tx_id) -> Transaction | None:  # accepts UUID string
         return self.dao.get(tx_id)
@@ -106,7 +180,164 @@ class TransactionService:
             raise ValueError("Transaction not found after update")
         return tx
 
+    # --- Category suggestion -----------------------------------------------
+    def suggest_category_for(
+        self,
+        tx_id: str,
+        *,
+        threshold: float = 0.5,
+        auto_assign: bool = True,
+        commit: bool = True,
+    ) -> tuple[str | None, float | None, str, str | None]:
+        """Suggest a category name for a transaction.
+
+        Returns (category_name|None, score|None, reason, counterparty_name|None)
+        Reason gives a short explanation (e.g. 'ml', 'rule:name match', 'no-text').
+        """
+        tx = self.get(tx_id)
+        if tx is None:
+            raise ValueError("Transaction not found")
+        # Aggregate text fields.
+        # Strategy:
+        #   - Keep counterparty_name, but remove a small set of personal names (self.to_strip)
+        #   - Strip digits only from the other more free-form fields (transaction_type, notes)
+        #   - Collapse whitespace after cleaning
+        name_part = tx.counterparty_name or ""
+        other_raw = " \n".join(p for p in [tx.transaction_type, tx.notes] if p)
+        # Strip digits from the non-name portion only
+        other_no_digits = re.sub(r"\d+", " ", other_raw)
+        other_norm = " ".join(other_no_digits.split())
+        all_parts = f"{name_part} {other_norm}"
+        # Remove personal names (one-time compiled regex) to reduce bias
+        all_striped = self._get_name_strip_re().sub(" ", all_parts)
+        text = " ".join(all_striped.split())
+        if not text.strip():
+            return None, None, "no-text", tx.counterparty_name
+        # Fetch (cached) category labels (flattened surface)
+        surface_labels = self._category_labels
+        if not surface_labels:
+            return None, None, "no-categories", tx.counterparty_name
+
+        # Prepare mapping from variant -> canonical (first variant maps to its base name)
+        variant_to_canonical: dict[str, str] = {}
+        for c in self.category_dao.list(limit=500):
+            base = c.name
+            variants = [c.name]
+            if getattr(c, "expanded_phrase", None):  # keep guard for missing attr in older objects
+                variants.append(c.expanded_phrase)  # type: ignore[attr-defined]
+            for a in getattr(c, "aliases", []) or []:  # type: ignore[attr-defined]
+                variants.append(a)
+            for v in variants:
+                if v not in variant_to_canonical:
+                    variant_to_canonical[v] = base
+
+        # ML prediction (hybrid embedding + optional LLM)
+        pred, reason_code = self.classifier.suggest_best_hybrid(
+            text=text, candidate_labels=surface_labels, mode="auto"
+        )
+        if not pred:
+            return None, None, "no-prediction", tx.counterparty_name
+        canonical = variant_to_canonical.get(pred.label, pred.label)
+        reason_final = reason_code if canonical == pred.label else f"{reason_code}:variant"
+        # Delegate any optional auto-assignment (side-effect) to helper for separation of concerns
+        self._maybe_assign_category(
+            tx,
+            canonical,
+            pred.score,
+            reason_final,
+            threshold=threshold,
+            auto_assign=auto_assign,
+            commit=commit,
+        )
+        return canonical, pred.score, reason_final, tx.counterparty_name
+
+    def bulk_suggest_categories(self, *, limit: int = 50, threshold: float = 0.5) -> list[dict]:
+        """Suggest (and auto-assign) categories for uncategorized transactions.
+
+        Behaviour:
+          * Gathers up to `limit` most recent uncategorized transactions.
+          * Runs ML hybrid suggestion only (no legacy substring heuristic).
+          * If a suggestion exists and score >= threshold it will assign the category immediately
+            (if the category name exists).
+          * Returns a list of dictionaries containing: id, suggested, score, reason, assigned(bool), counterparty_name.
+        """
+        rows = [
+            r
+            for r in self.dao.list(limit=limit, sort_by="booking_date", sort_dir="desc")
+            if r.category_id is None
+        ][:limit]
+        out: list[dict] = []
+        any_assigned = False
+        for tx in rows:
+            try:
+                # Defer commit for batch efficiency
+                suggested, score, reason, counterparty_name = self.suggest_category_for(
+                    str(tx.id), threshold=threshold, auto_assign=True, commit=False
+                )
+            except ValueError:
+                logger.error("Failed to suggest category for transaction id=%s", str(tx.id))
+                continue
+            assigned = tx.category_id is not None
+            if assigned:
+                any_assigned = True
+            out.append(
+                {
+                    "id": str(tx.id),
+                    "suggested": suggested,
+                    "score": score,
+                    "reason": reason,
+                    "assigned": assigned,
+                    "counterparty_name": counterparty_name,
+                }
+            )
+        if any_assigned:
+            try:
+                self.dao.commit()
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("Failed committing assigned categories; rolling back")
+                self.dao.rollback()
+        return out
+
     # --- Internal helpers -----------------------------------------------------
+    def _maybe_assign_category(
+        self,
+        tx: Transaction,
+        category_name: str | None,
+        score: float | None,
+        reason: str,
+        *,
+        threshold: float,
+        auto_assign: bool,
+        commit: bool,
+    ) -> bool:
+        """Conditionally assign a category to a transaction.
+
+                Returns True if an assignment occurred.
+
+                Assignment criteria (when auto_assign is True):
+                    * score >= threshold
+                    * category_name resolves to an existing Category
+                    * transaction not already assigned to that category
+
+        Any database errors during commit are logged and rolled back; the
+        method then returns False without raising so suggestion results aren't blocked.
+        """
+        if not (auto_assign and category_name):
+            return False
+        if not (score is not None and score >= threshold):
+            return False
+        cat_obj = self.category_dao.get_by_name(category_name)
+        if not cat_obj:
+            return False
+        try:
+            assigned = self.dao.assign_category(str(tx.id), cat_obj.id, commit=commit)
+            return assigned
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Auto-assign category via DAO failed; rolling back")
+            if commit:
+                self.dao.rollback()
+            return False
+
     def _extract_single_table(self, raw: bytes) -> bytes:
         """
         Try to keep only the first (main) table from a CSV export that may contain
@@ -177,7 +408,9 @@ class TransactionService:
 
         Injects the resolved `account_id` based on the account number.
         """
-        transaction_in = TransactionIn(**row.to_dict())
+        # Use model_validate to avoid potential self-referential init issues in TransactionIn
+        data = row.to_dict()
+        transaction_in = TransactionIn.model_validate(data)
         account = account_map.get(transaction_in.account)
         if account is None:
             raise ValueError(f"Account not found for number: {transaction_in.account}")

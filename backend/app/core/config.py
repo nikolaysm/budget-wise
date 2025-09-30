@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./budget_wise.db"
     db_echo: bool = True
     allowed_origins: list[str] = []  # e.g. ["http://localhost:3000"]
+    # OpenAI embedding classifier configuration
+    openai_api_key: str | None = None
+    # https://platform.openai.com/docs/guides/embeddings
+    openai_embedding_model: str = "text-embedding-3-large"
+    openai_timeout_sec: float = 15.0
+    # Optional future completion / structured output model (e.g., gpt-4o, gpt-4o-mini)
+    # https://platform.openai.com/docs/pricing
+    openai_completion_model: str | None = None
+    # Scheduler related
+    scheduler_enabled: bool = True
+    scheduler_timezone: str = "UTC"
 
 
 @lru_cache
@@ -34,7 +45,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
-LOGGER_CONFIG = LOGGING_CONFIG = {
+LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {

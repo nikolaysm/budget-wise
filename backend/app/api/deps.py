@@ -2,6 +2,7 @@
 
 Simplified single module version requested by user.
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -24,10 +25,9 @@ def get_db() -> Generator[Session, None, None]:
 
 def get_transaction_service(db: Session = Depends(get_db)) -> TransactionService:
     """Provide TransactionService bound to session."""
-    return TransactionService(TransactionDAO(db), AccountDAO(db), db)
+    return TransactionService(TransactionDAO(db), AccountDAO(db), CategoryDAO(db), db)
 
 
 def get_category_service(db: Session = Depends(get_db)) -> CategoryService:
     """Provide CategoryService bound to session."""
     return CategoryService(CategoryDAO(db), TransactionDAO(db), db)
-# (Removed duplicated legacy block)

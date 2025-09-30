@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 
@@ -121,28 +122,34 @@ async def list_transactions(
 
 
 @router.get(
+    "/suggest-categories",
+    summary="Suggest categories for uncategorized transactions (batch)",
+)
+def suggest_categories(
+    *,
+    limit: int = Query(25, ge=1, le=200),
+    threshold: float = Query(0.4, ge=0, le=1),
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
+) -> list[dict]:
+    return service.bulk_suggest_categories(limit=limit, threshold=threshold)
+
+
+@router.get(
     "/{transaction_id}",
     response_model=TransactionOut,
     summary="Get a transaction by ID",
 )
 def read_transaction(
     *,
-    transaction_id: str,  # UUID string
+    transaction_id: UUID,  # UUID path param
     service: Annotated[TransactionService, Depends(get_transaction_service)],
 ) -> TransactionOut:
     """Retrieve a single transaction by its primary key.
 
-    Args:
-        transaction_id (int): ID of the transaction to retrieve.
-        db (Session): Database session dependency.
-
-    Returns:
-        Transaction: The requested transaction.
-
-    Raises:
-        HTTPException: If the transaction does not exist.
+    FastAPI will only match this route if the path segment is a valid UUID,
+    preventing accidental capture of static subpaths like 'suggest-categories'.
     """
-    transaction = service.get(transaction_id)
+    transaction = service.get(str(transaction_id))
     if not transaction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     cat = getattr(transaction, "category", None)
@@ -169,6 +176,7 @@ def read_transaction(
         account_id=transaction.account_id,
     )
 
+
 @router.patch(
     "/{transaction_id}/set-number",
     response_model=TransactionOut,
@@ -176,13 +184,13 @@ def read_transaction(
 )
 def set_transaction_number(
     *,
-    transaction_id: str,
+    transaction_id: UUID,
     payload: SetTransactionNumber,
     service: Annotated[TransactionService, Depends(get_transaction_service)],
 ) -> TransactionOut:
     """Assign a transaction number to an existing transaction (idempotent overwrite)."""
     try:
-        tx = service.set_transaction_number(transaction_id, payload.number)
+        tx = service.set_transaction_number(str(transaction_id), payload.number)
     except ValueError:
         raise HTTPException(status_code=404, detail="Transaction not found") from None
     cat = getattr(tx, "category", None)
@@ -208,3 +216,28 @@ def set_transaction_number(
         category_id=tx.category_id,
         account_id=tx.account_id,
     )
+
+
+@router.get(
+    "/{transaction_id}/suggest-category",
+    summary="Suggest a category for a single transaction",
+)
+def suggest_transaction_category(
+    *,
+    transaction_id: UUID,
+    threshold: float = Query(0.4, ge=0, le=1),
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
+) -> dict:
+    try:
+        suggested, score, reason, counterparty_name = service.suggest_category_for(
+            str(transaction_id), threshold=threshold
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Transaction not found") from None
+    return {
+        "id": str(transaction_id),
+        "suggested": suggested,
+        "score": score,
+        "reason": reason,
+        "counterparty_name": counterparty_name,
+    }
