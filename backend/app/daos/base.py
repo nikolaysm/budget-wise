@@ -89,6 +89,15 @@ class BaseDAO(Generic[T]):
                 self.session.refresh(obj)
         return items
 
+    # Transaction helpers -------------------------------------------------
+    def commit(self) -> None:
+        """Commit the current database transaction."""
+        self.session.commit()
+
+    def rollback(self) -> None:
+        """Rollback the current database transaction."""
+        self.session.rollback()
+
     def get(self, obj_id: Any) -> T | None:
         return self.session.get(self.model, obj_id)
 
@@ -102,30 +111,6 @@ class BaseDAO(Generic[T]):
     ) -> list[T]:
         stmt = self.get_queryset(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
         return list(self.session.exec(stmt))
-
-    # def list_and_count(self, *, offset: int = 0, limit: int = 100) -> tuple[list[T], int]:
-    #     total_col = func.count().over().label("_total_count")
-
-    #     # build a non-scalar select (model + count)
-    #     stmt = select(self.model, total_col)
-    #     order_by = self._default_order_by()
-    #     if order_by is not None:
-    #         stmt = stmt.order_by(order_by)
-    #     if offset:
-    #         stmt = stmt.offset(offset)
-    #     if limit:
-    #         stmt = stmt.limit(limit)
-
-    #     # fetch as tuples -> list[tuple[T, int]]
-    #     rows = self.session.exec(stmt).all()
-    #     if not rows:
-    #         return [], 0
-    #     import pdb
-
-    #     pdb.set_trace()
-    #     items = [row[0] for row in rows]  # model instances
-    #     total = int(rows[0][1])  # same total on every row
-    #     return items, total
 
     def list_and_count(
         self,

@@ -19,7 +19,16 @@ def list_categories(
     service: Annotated[CategoryService, Depends(get_category_service)],
 ) -> list[CategoryOut]:
     cats = service.list(limit=500)
-    return [CategoryOut(id=c.id, name=c.name, slug=c.slug) for c in cats]
+    return [
+        CategoryOut(
+            id=c.id,
+            name=c.name,
+            slug=c.slug,
+            expanded_phrase=c.expanded_phrase,
+            aliases=c.aliases,
+        )
+        for c in cats
+    ]
 
 
 @router.get("/search", response_model=list[CategoryOut], summary="Search categories by name prefix")
@@ -29,7 +38,16 @@ def search_categories(
     service: Annotated[CategoryService, Depends(get_category_service)] = None,  # type: ignore
 ) -> list[CategoryOut]:
     cats = service.search(q=q, limit=limit)  # type: ignore[arg-type]
-    return [CategoryOut(id=c.id, name=c.name, slug=c.slug) for c in cats]
+    return [
+        CategoryOut(
+            id=c.id,
+            name=c.name,
+            slug=c.slug,
+            expanded_phrase=c.expanded_phrase,
+            aliases=c.aliases,
+        )
+        for c in cats
+    ]
 
 
 @router.post(
@@ -42,25 +60,51 @@ def create_category(
     payload: CategoryIn,
     service: Annotated[CategoryService, Depends(get_category_service)],
 ) -> CategoryOut:
-    cat = service.create(payload.name)
-    return CategoryOut(id=cat.id, name=cat.name, slug=cat.slug)
+    cat = service.create(
+        payload.name,
+        expanded_phrase=payload.expanded_phrase,
+        aliases=payload.aliases,
+    )
+    return CategoryOut(
+        id=cat.id,
+        name=cat.name,
+        slug=cat.slug,
+        expanded_phrase=cat.expanded_phrase,
+        aliases=cat.aliases,
+    )
 
 
 @router.put(
     "/{category_id}",
     response_model=CategoryOut,
-    summary="Rename a category",
+    summary="Update a category (name / expanded_phrase / aliases)",
 )
-def rename_category(
+def update_category(
     category_id: Annotated[str, Path()],
     payload: CategoryIn,
     service: Annotated[CategoryService, Depends(get_category_service)],
 ) -> CategoryOut:
     try:
-        cat = service.rename(category_id, payload.name)
+        # Rename first if name is changing
+        cat = service.get(category_id)
+        if not cat:
+            raise ValueError
+        if payload.name and payload.name != cat.name:
+            cat = service.rename(category_id, payload.name)
+        cat = service.update(
+            category_id,
+            expanded_phrase=payload.expanded_phrase,
+            aliases=payload.aliases,
+        )
     except ValueError:
         raise HTTPException(status_code=404, detail="Category not found") from None
-    return CategoryOut(id=cat.id, name=cat.name, slug=cat.slug)
+    return CategoryOut(
+        id=cat.id,
+        name=cat.name,
+        slug=cat.slug,
+        expanded_phrase=cat.expanded_phrase,
+        aliases=cat.aliases,
+    )
 
 
 @router.post(

@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { listCategories, createCategory, renameCategory, Category } from '@/services/api';
+import { listCategories, createCategory, updateCategoryApi, Category, CategoryInput } from '@/services/api';
 
 const key = ['categories'];
 
@@ -12,12 +12,12 @@ export function useCategories() {
   return swr;
 }
 
-export async function addCategory(name: string, mutate: () => void) {
-  await createCategory(name);
+export async function addCategory(input: CategoryInput, mutate: () => void) {
+  await createCategory(input);
   mutate();
 }
 
-export async function updateCategory(id: string, name: string, mutate: () => void) {
-  await renameCategory(id, name);
+export async function updateCategory(id: string, input: Partial<CategoryInput>, mutate: () => void) {
+  await updateCategoryApi(id, input);
   mutate();
 }

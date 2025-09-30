@@ -3,17 +3,19 @@ SQLModel definitions for transactions.
 
 Each transaction corresponds to a row in the uploaded CSV/Excel file. The model
 includes optional fields for data that may not always be present. The primary
-key `id` is an auto‑incrementing integer.
+key `id` is a UUID. The `transaction_number` field is indexed
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from pydantic import AliasChoices, ValidatorFunctionWrapHandler, field_validator
+from pydantic import AliasChoices, field_validator
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Date, Field, Relationship, SQLModel
 
@@ -41,8 +43,10 @@ class TransactionBase(SQLModel):
         },
     )
     # Unique transaction number ("Transactienummer").
+    # Database constraint (unique=True) will enforce uniqueness among non-null values (PostgreSQL allows multiple NULLs).
     transaction_number: int | None = Field(
         default=None,
+        index=True,
         schema_extra={"validation_alias": AliasChoices("Transactienummer", "transaction_number")},
     )
     # Counterparty account ("Rekening tegenpartij").
@@ -75,12 +79,12 @@ class TransactionBase(SQLModel):
         schema_extra={"validation_alias": AliasChoices("Transactie", "transaction_type")},
     )
     # Value date ("Valutadatum"). Could be converted to date.
-    value_date: str | None = Field(
+    value_date: date | None = Field(
         default=None,
         schema_extra={"validation_alias": AliasChoices("Valutadatum", "value_date")},
     )
     # Amount ("Bedrag"). Negative values represent expenses.
-    amount: float = Field(schema_extra={"validation_alias": AliasChoices("Bedrag", "amount")})
+    amount: Decimal = Field(schema_extra={"validation_alias": AliasChoices("Bedrag", "amount")})
     # Currency code ("Devies").
     currency: str | None = Field(
         default=None, schema_extra={"validation_alias": AliasChoices("Devies", "currency")}
@@ -105,9 +109,23 @@ class TransactionBase(SQLModel):
 
 
 class Transaction(TransactionBase, table=True):
-    """Database model for a transaction including an auto‑incrementing primary key."""
+    """Database model for a transaction including an UUID primary key."""
 
     id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    # Enforce uniqueness of (account_id, transaction_number) pairs. Multiple NULLs allowed per column.
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id",
+            "booking_date",
+            "transaction_number",
+            "counterparty_name",
+            "transaction_type",
+            "amount",
+            "notes",
+            name="uq_transaction_account_txnum",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
     # Relationship to Category. The annotation string prevents circular import issues.
     category: Mapped[Category | None] = Relationship(
         sa_relationship=relationship(back_populates="transactions")
@@ -123,11 +141,47 @@ class Transaction(TransactionBase, table=True):
 class TransactionIn(TransactionBase):
     """Input model for creating transactions, with data validation."""
 
-    @field_validator("amount", mode="wrap")
+    @field_validator("amount", mode="before")
     @classmethod
-    def comma_to_dot(cls, value: str, handler: ValidatorFunctionWrapHandler) -> float:
-        value = value.replace(",", ".")
-        return handler(value)
+    def comma_to_dot(cls, value: str) -> Decimal | None:
+        if value in (None, ""):
+            return None
+        s = str(value).replace(",", ".")
+        d = Decimal(s)
+        return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @field_validator("booking_date", "value_date", mode="before")
+    @classmethod
+    def parse_date(cls, v):  # noqa: ANN001
+        """Accept multiple date string formats (e.g. '02/07/2025', '2025-07-02').
+
+        If parsing fails we return the original value so Pydantic can raise its
+        standard validation error, preserving transparency.
+        """
+        if v in (None, ""):
+            return None
+        if isinstance(v, date):  # already parsed
+            return v
+        if not isinstance(v, str):
+            return v
+        raw = v.strip()
+        # Normalize common separators
+        normalized = raw.replace(".", "/").replace("-", "/")
+        patterns = [
+            "%d/%m/%Y",  # European style (most likely for provided data)
+            "%Y/%m/%d",  # ISO with slashes
+            "%Y/%d/%m",  # fallback just in case
+        ]
+        for fmt in patterns:
+            try:
+                return datetime.strptime(normalized, fmt).date()
+            except ValueError:
+                continue
+        # Last attempt: ISO directly (YYYY-MM-DD) if user already in that style
+        try:
+            return datetime.fromisoformat(raw).date()
+        except Exception:  # pragma: no cover - fall through to pydantic error
+            return v
 
 
 class TransactionOut(TransactionBase):

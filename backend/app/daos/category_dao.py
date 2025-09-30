@@ -52,6 +52,46 @@ class CategoryDAO(BaseDAO[Category]):
         obj = Category(name=name, slug=slug)
         return self.create(obj, commit=commit, refresh=True)
 
+    def create_full(
+        self,
+        *,
+        name: str,
+        expanded_phrase: str | None = None,
+        aliases: list[str] | None = None,
+        commit: bool = True,
+    ) -> Category:
+        """Create a category including optional expanded phrase and aliases.
+
+        If a category with the same name exists, it is returned (idempotent by name) and
+        optionally updated with provided expanded_phrase / aliases if those fields are empty.
+        """
+        aliases = aliases or []
+        existing = self.get_by_name(name)
+        if existing:
+            changed = False
+            if expanded_phrase and not existing.expanded_phrase:
+                existing.expanded_phrase = expanded_phrase
+                changed = True
+            if aliases and not existing.aliases:
+                existing.aliases = aliases
+                changed = True
+            if changed:
+                self.session.add(existing)
+                if commit:
+                    self.session.commit()
+                    self.session.refresh(existing)
+            return existing
+        cat = self.create_unique(name, commit=False)
+        if expanded_phrase:
+            cat.expanded_phrase = expanded_phrase
+        if aliases:
+            cat.aliases = aliases
+        self.session.add(cat)
+        if commit:
+            self.session.commit()
+            self.session.refresh(cat)
+        return cat
+
     # Rename with slug update -------------------------------------------
     def rename(self, category_id, new_name: str) -> Category | None:  # noqa: ANN001
         cat = self.get(category_id)
@@ -70,4 +110,30 @@ class CategoryDAO(BaseDAO[Category]):
         self.session.add(cat)
         self.session.commit()
         self.session.refresh(cat)
+        return cat
+
+    def update_fields(
+        self,
+        category_id,
+        *,
+        expanded_phrase: str | None = None,
+        aliases: list[str] | None = None,
+        commit: bool = True,
+    ) -> Category | None:  # noqa: ANN001
+        cat = self.get(category_id)
+        if not cat:
+            return None
+        changed = False
+        if expanded_phrase is not None and expanded_phrase != cat.expanded_phrase:
+            cat.expanded_phrase = expanded_phrase
+            changed = True
+        if aliases is not None and aliases != cat.aliases:
+            cat.aliases = aliases
+            changed = True
+        if not changed:
+            return cat
+        self.session.add(cat)
+        if commit:
+            self.session.commit()
+            self.session.refresh(cat)
         return cat
