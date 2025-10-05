@@ -1,4 +1,5 @@
 """Aggregation output schemas for transaction analytics endpoints."""
+
 from __future__ import annotations
 
 from decimal import Decimal
