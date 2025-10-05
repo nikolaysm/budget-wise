@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+
 import { listCategories, createCategory, updateCategoryApi, Category, CategoryInput } from '@/services/api';
 
 const key = ['categories'];

@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.7",
@@ -35,6 +35,8 @@
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@babel/eslint-parser": "^7.25.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.37.0",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",
@@ -42,8 +44,11 @@
     "@typescript-eslint/eslint-plugin": "^8.1.0",
     "@typescript-eslint/parser": "^8.1.0",
     "autoprefixer": "^10.4.19",
-    "eslint": "^9.36.0",
+    "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^4.1.0",
     "tw-animate-css": "^1.3.7",

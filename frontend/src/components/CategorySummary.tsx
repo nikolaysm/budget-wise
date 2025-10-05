@@ -1,10 +1,13 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getCategorySummary, CategorySummaryItem, CategorySummaryEnvelope } from '../services/categorySummary';
 import { RotateCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import type { DateRange } from 'react-day-picker';
+
+import { Button } from '@/components/ui/button';
+
+import { getCategorySummary, CategorySummaryItem, CategorySummaryEnvelope } from '../services/categorySummary';
+
 import { DateRangePicker } from './DateRangePicker';
 
 interface Props {
@@ -49,7 +52,7 @@ export const CategorySummary: React.FC<Props> = ({ initialFrom, initialTo }) => 
     useEffect(() => {
         setMounted(true);
         // Load data once mounted (ensures consistent server/client markup before hydration)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
         load();
     }, []);
 

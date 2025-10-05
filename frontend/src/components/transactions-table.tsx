@@ -4,12 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Check, X, ArrowUp, ArrowDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { mutate as globalMutate } from 'swr';
-import AsyncCategorySelect from './AsyncCategorySelect';
-import TransactionNumberCell from './TransactionNumberCell';
-import { assignTransactionCategory, optimisticUpdateTransactionCategories, bulkAssignTransactionCategory, Transaction } from '@/services/api';
-import { useCategories } from '@/lib/hooks/useCategories';
-import { useTransactionsPage } from '@/lib/hooks/useTransactionsPage';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
 	ColumnDef,
 	flexRender,
@@ -20,6 +14,15 @@ import {
 	RowSelectionState,
 } from '@tanstack/react-table';
 import clsx from 'clsx';
+
+import { assignTransactionCategory, optimisticUpdateTransactionCategories, bulkAssignTransactionCategory, Transaction } from '@/services/api';
+import { useCategories } from '@/lib/hooks/useCategories';
+import { useTransactionsPage } from '@/lib/hooks/useTransactionsPage';
+import { Skeleton } from '@/components/ui/skeleton';
+
+import TransactionNumberCell from './TransactionNumberCell';
+import AsyncCategorySelect from './AsyncCategorySelect';
+
 
 // --- Type augmentation for custom column meta fields -----------------------
 declare module '@tanstack/react-table' {
@@ -260,7 +263,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 			setSortDir(s.desc ? 'desc' : 'asc');
 			setOffset(0);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		 
 	}, [sorting]);
 
 	const table = useReactTable({

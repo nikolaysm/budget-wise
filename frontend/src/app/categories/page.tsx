@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Link from 'next/link';
+
 import { useCategories, updateCategory, addCategory } from '@/lib/hooks/useCategories';
 import { ClientTransactionStatsCards } from '@/components/client-transaction-stats-cards';
 
