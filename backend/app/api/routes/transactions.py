@@ -10,6 +10,7 @@ transactions and retrieval by ID.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -18,7 +19,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from app.api.deps import get_transaction_service
 from app.core.config import get_settings
 from app.models.transaction import Transaction, TransactionOut
-from app.schemas.pagination import PaginationIn, PaginationOut
+from app.schemas import (
+    CategorySummaryOut,
+    PaginationIn,
+    PaginationOut,
+    SortParams,
+    TransactionFilters,
+)
 from app.schemas.transaction import SetTransactionNumber
 from app.services.transaction_service import TransactionService
 
@@ -45,7 +52,6 @@ async def upload_transactions(
 
     Args:
         file (UploadFile): The uploaded file containing transactions.
-        db (Session): Database session dependency.
 
     Returns:
         List[Transaction]: A list of persisted transactions.
@@ -71,16 +77,15 @@ async def upload_transactions(
     summary="List transactions (paginated)",
 )
 async def list_transactions(
-    pagination: Annotated[PaginationIn, Query()],
+    pagination: Annotated[PaginationIn, Depends()],
+    filters: Annotated[TransactionFilters, Depends()],
+    sorting: Annotated[SortParams, Depends()],
     service: Annotated[TransactionService, Depends(get_transaction_service)],
-) -> PaginationOut[Transaction]:
+    # pagination: Annotated[PaginationIn, Query()],
+    # filters: Annotated[TransactionFilters, Query()],
+) -> PaginationOut[TransactionOut]:
     """Retrieve a paginated list of transactions wrapped in a pagination envelope."""
-    rows, total = service.list_and_count(
-        offset=pagination.offset,
-        limit=pagination.limit + 1,
-        sort_by=pagination.sort_by,
-        sort_dir=pagination.sort_dir,
-    )
+    rows, total = service.list_and_count(pagination=pagination, sorting=sorting, filters=filters)
     items = rows[: pagination.limit]
     has_more = len(rows) > pagination.limit
     # Map to read schema adding category_name
@@ -132,6 +137,32 @@ def suggest_categories(
     service: Annotated[TransactionService, Depends(get_transaction_service)],
 ) -> list[dict]:
     return service.bulk_suggest_categories(limit=limit, threshold=threshold)
+
+
+@router.get(
+    "/stats",
+    summary="Get transaction categorization stats",
+)
+def transaction_stats(
+    *, service: Annotated[TransactionService, Depends(get_transaction_service)]
+) -> dict[str, int]:
+    """Return counts of transactions with and without categories."""
+    return service.categorization_stats()
+
+
+@router.get(
+    "/category-summary",
+    response_model=CategorySummaryOut,
+    summary="Aggregate transactions by category (with optional date range)",
+)
+def transaction_category_summary(
+    *,
+    date_from: date | None = Query(None, description="Inclusive start booking_date"),
+    date_to: date | None = Query(None, description="Inclusive end booking_date"),
+    service: Annotated[TransactionService, Depends(get_transaction_service)],
+) -> CategorySummaryOut:
+    """Return aggregated totals grouped by category as an envelope with totals."""
+    return service.category_summary(date_from=date_from, date_to=date_to)
 
 
 @router.get(

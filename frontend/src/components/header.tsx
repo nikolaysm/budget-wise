@@ -16,6 +16,7 @@ export default function Header() {
           <span className="font-semibold">Budget Wise</span>
         </Link>
         <nav className="flex items-center gap-4 text-sm text-gray-600">
+          <Link href="/dashboard" className="hover:text-gray-900 transition-colors">Dashboard</Link>
           <Link href="/transactions" className="hover:text-gray-900 transition-colors">Transactions</Link>
         </nav>
       </div>

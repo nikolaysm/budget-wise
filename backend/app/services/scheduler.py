@@ -23,13 +23,13 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.api.deps import get_db
-from app.core.config import get_settings
+from app.core.config import settings
 from app.daos.account_dao import AccountDAO
 from app.daos.category_dao import CategoryDAO
 from app.daos.transaction_dao import TransactionDAO
 from app.services.transaction_service import TransactionService
 
-logger = logging.getLogger(get_settings().app_logger_name)
+logger = logging.getLogger(settings.app_logger_name)
 
 scheduler: AsyncIOScheduler | None = None
 JOB_ID_SUGGEST = "auto_category_suggestions"
@@ -71,13 +71,18 @@ async def _suggest_categories_job() -> None:
 
     def _work() -> tuple[int, int]:
         with _db_session() as db:
-            if not _try_pg_lock(db, PG_LOCK_KEY):
-                logger.info("Job %s skipped (another node holds the lock)", JOB_ID_SUGGEST)
-                return 0, 0
+            # Only attempt advisory locks when using Postgres; fall back to no locking otherwise.
+            dialect = getattr(getattr(db, "bind", None), "dialect", None)
+            is_postgres = bool(dialect and dialect.name.startswith("postgres"))
+            got_lock = True
+            if is_postgres:
+                got_lock = _try_pg_lock(db, PG_LOCK_KEY)
+                if not got_lock:
+                    logger.info("Job %s skipped (another node holds the lock)", JOB_ID_SUGGEST)
+                    return 0, 0
             try:
-                service = TransactionService(
-                    TransactionDAO(db), AccountDAO(db), CategoryDAO(db), db
-                )
+                # Pass session explicitly to TransactionService
+                service = TransactionService(TransactionDAO(db), AccountDAO(db), CategoryDAO(db))
                 suggestions = service.bulk_suggest_categories(limit=25)
                 non_null = [s for s in suggestions if s.get("suggested")]
                 return len(non_null), len(suggestions)
@@ -85,7 +90,8 @@ async def _suggest_categories_job() -> None:
                 logger.exception("Scheduler suggestion job failed")
                 return 0, 0
             finally:
-                _unlock_pg(db, PG_LOCK_KEY)
+                if is_postgres and got_lock:
+                    _unlock_pg(db, PG_LOCK_KEY)
 
     non_null, total = await loop.run_in_executor(None, _work)
     logger.info(
@@ -99,7 +105,6 @@ async def _suggest_categories_job() -> None:
 def start_scheduler() -> None:
     """Start background scheduler if enabled and not already running."""
     global scheduler
-    settings = get_settings()
     if not settings.scheduler_enabled:
         logger.info("Scheduler disabled by configuration")
         return
@@ -119,9 +124,10 @@ def start_scheduler() -> None:
 
     sched.add_job(
         _suggest_categories_job,
-        CronTrigger(minute="*/30"),
+        CronTrigger(minute="*/5"),  # every 5 minutes
         id=JOB_ID_SUGGEST,
         replace_existing=True,
+        max_instances=1,
         jitter=30,  # small spread to avoid thundering herd on resume
     )
 
@@ -136,3 +142,31 @@ def shutdown_scheduler() -> None:  # pragma: no cover
     if scheduler and scheduler.running:
         scheduler.shutdown(wait=False)
         logger.info("Scheduler shut down")
+
+
+def run_suggestions_once() -> None:  # pragma: no cover - convenience helper
+    """Run the suggestion job synchronously (creates its own event loop if needed)."""
+    import asyncio
+
+    asyncio.run(_suggest_categories_job())
+
+
+if __name__ == "__main__":  # pragma: no cover - manual invocation helper
+    import argparse
+    import asyncio
+    import logging.config
+
+    from app.core.config import LOGGING_CONFIG
+
+    logging.config.dictConfig(LOGGING_CONFIG)
+
+    parser = argparse.ArgumentParser(
+        description="Run category suggestion job once. (Full scheduling happens inside the FastAPI lifespan.)"
+    )
+    parser.add_argument(
+        "suggest-once",
+        nargs="?",
+        help="Optional literal; retained for backwards compatibility. Running without it still performs one run.",
+    )
+    _ = parser.parse_args()  # we don't need to inspect args; single behavior
+    asyncio.run(_suggest_categories_job())

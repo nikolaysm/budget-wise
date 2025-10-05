@@ -3,25 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-
-from sqlmodel import Session
+from uuid import UUID
 
 from app.daos.category_dao import CategoryDAO
 from app.daos.transaction_dao import TransactionDAO
 from app.models.category import Category
+from app.schemas import PaginationIn, SortParams
 
 
 class CategoryService:
-    def __init__(
-        self, category_dao: CategoryDAO, transaction_dao: TransactionDAO, session: Session
-    ):
+    def __init__(self, category_dao: CategoryDAO, transaction_dao: TransactionDAO):
         self.category_dao = category_dao
         self.transaction_dao = transaction_dao
-        self.session = session
 
     # Category CRUD ---------------------------------------------------------
-    def list(self, *, offset: int = 0, limit: int = 100) -> list[Category]:
-        return self.category_dao.list(offset=offset, limit=limit)
+    def list(self, *, pagination: PaginationIn, sorting: SortParams) -> list[Category]:
+        return self.category_dao.list(pagination=pagination, sorting=sorting)
 
     def search(self, *, q: str, limit: int = 20) -> list[Category]:
         return self.category_dao.search(q, limit)
@@ -77,7 +74,7 @@ class CategoryService:
         if not ok:
             raise ValueError("Transaction not found")
 
-    def bulk_assign(self, *, transaction_ids: list[str], category_name: str) -> int:
+    def bulk_assign(self, *, transaction_ids: list[UUID], category_name: str) -> int:
         category = self.get_by_name(category_name)
         if category is None:
             raise ValueError("Category not found")

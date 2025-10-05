@@ -5,12 +5,13 @@ from __future__ import annotations
 import io
 import logging
 import re
+from datetime import date
+from decimal import Decimal
 from functools import cached_property
 
 import numpy as np
 import pandas as pd
 from pydantic import ValidationError
-from sqlmodel import Session
 
 from app.core.config import get_settings
 from app.daos.account_dao import AccountDAO
@@ -18,6 +19,13 @@ from app.daos.category_dao import CategoryDAO
 from app.daos.transaction_dao import TransactionDAO
 from app.models.account import Account
 from app.models.transaction import Transaction, TransactionIn
+from app.schemas import (
+    CategorySummaryItem,
+    CategorySummaryOut,
+    PaginationIn,
+    SortParams,
+    TransactionFilters,
+)
 from app.services.ai_service import AIInferenceService
 
 logger = logging.getLogger(get_settings().app_logger_name)
@@ -60,11 +68,9 @@ class TransactionService:
         dao: TransactionDAO,
         account_dao: AccountDAO,
         category_dao: CategoryDAO,
-        session: Session,
         classifier: AIInferenceService | None = None,
     ):
         self.dao = dao
-        self.session = session
         self.account_dao = account_dao
         self.category_dao = category_dao
         self.classifier = classifier or AIInferenceService()
@@ -83,7 +89,7 @@ class TransactionService:
         """
         labels: list[str] = []
         seen: set[str] = set()
-        for c in self.category_dao.list(limit=500):
+        for c in self._list_categories_for_cache():
             for candidate in [c.name, getattr(c, "expanded_phrase", None)]:
                 if candidate and candidate not in seen:
                     seen.add(candidate)
@@ -103,52 +109,86 @@ class TransactionService:
     def list(
         self,
         *,
-        offset: int = 0,
-        limit: int = 100,
-        sort_by: str | None = None,
-        sort_dir: str | None = None,
-        category: str | None = None,
-        exclude_null_category: bool = False,
+        pagination: PaginationIn,
+        sorting: SortParams,
+        filters: TransactionFilters | None = None,
     ) -> list[Transaction]:
-        items = self.dao.list(offset=offset, limit=limit, sort_by=sort_by, sort_dir=sort_dir)
-        if exclude_null_category:
-            items = [t for t in items if t.category_id is not None]
-        if category:
-            cat = self.category_dao.get_by_name(category)
-            if not cat:
-                return []
-            items = [t for t in items if t.category_id == cat.id]
-        return items
+        return self.dao.list(pagination=pagination, sorting=sorting, filters=filters)
 
     def list_and_count(
         self,
         *,
-        offset: int = 0,
-        limit: int = 100,
-        sort_by: str | None = None,
-        sort_dir: str | None = None,
-        category: str | None = None,
-        exclude_null_category: bool = False,
+        pagination: PaginationIn,
+        sorting: SortParams,
+        filters: TransactionFilters | None = None,
     ) -> tuple[list[Transaction], int]:
-        items, total = self.dao.list_and_count(
-            offset=offset,
-            limit=limit,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-        )
-        # Apply filters in-memory (note: total refers to pre-filter count)
-        if exclude_null_category:
-            items = [t for t in items if t.category_id is not None]
-        if category:
-            cat = self.category_dao.get_by_name(category)
-            if not cat:
-                return [], 0
-            items = [t for t in items if t.category_id == cat.id]
-        # Adjust total to filtered size for caller expectation
-        return items, len(items)
+        return self.dao.list_and_count(pagination=pagination, sorting=sorting, filters=filters)
 
     def get(self, tx_id) -> Transaction | None:  # accepts UUID string
         return self.dao.get(tx_id)
+
+    def categorization_stats(self) -> dict[str, int]:
+        """Expose categorization statistics via service layer (delegates to DAO)."""
+        return self.dao.count_categorization_stats()
+
+    def category_summary(
+        self, *, date_from: date | str | None = None, date_to: date | str | None = None
+    ) -> CategorySummaryOut:
+        """Return aggregated totals grouped by category within optional date range.
+
+        Accepts either date objects (preferred) or YYYY-MM-DD strings (backward compatibility).
+        """
+        df: date | None
+        dt: date | None
+        if isinstance(date_from, str) and date_from:
+            try:
+                df = date.fromisoformat(date_from)
+            except ValueError:  # pragma: no cover - invalid input fallback
+                df = None
+        else:
+            df = date_from if isinstance(date_from, date) else None
+        if isinstance(date_to, str) and date_to:
+            try:
+                dt = date.fromisoformat(date_to)
+            except ValueError:  # pragma: no cover
+                dt = None
+        else:
+            dt = date_to if isinstance(date_to, date) else None
+
+        raw = self.dao.category_summary(date_from=df, date_to=dt)
+        items: list[CategorySummaryItem] = []
+        for r in raw:
+            cat_raw = r.get("category")
+            category = str(cat_raw) if cat_raw not in (None, "") else None
+            count_raw = r.get("count", 0)
+            try:
+                count_val = int(count_raw)  # type: ignore[arg-type]
+            except Exception:  # pragma: no cover - fallback
+                count_val = 0
+            amt_raw = r.get("total_amount", 0)
+            try:
+                if isinstance(amt_raw, Decimal):
+                    total_amt = amt_raw
+                else:
+                    total_amt = Decimal(str(amt_raw))
+            except Exception:  # pragma: no cover - fallback
+                total_amt = Decimal(0)
+            items.append(
+                CategorySummaryItem(
+                    category=category,
+                    count=count_val,
+                    total_amount=total_amt,
+                )
+            )
+        total_amount: Decimal = sum((i.total_amount for i in items), Decimal(0))
+        total_count = sum(i.count for i in items)
+        return CategorySummaryOut(
+            items=items,
+            date_from=df.isoformat() if df else None,
+            date_to=dt.isoformat() if dt else None,
+            total_amount=total_amount,
+            total_count=total_count,
+        )
 
     def ingest_file(self, *, filename: str, data: bytes) -> list[Transaction]:
         """Parse the uploaded file and persist each transaction."""
@@ -220,7 +260,7 @@ class TransactionService:
 
         # Prepare mapping from variant -> canonical (first variant maps to its base name)
         variant_to_canonical: dict[str, str] = {}
-        for c in self.category_dao.list(limit=500):
+        for c in self._list_categories_for_cache():
             base = c.name
             variants = [c.name]
             if getattr(c, "expanded_phrase", None):  # keep guard for missing attr in older objects
@@ -261,11 +301,11 @@ class TransactionService:
             (if the category name exists).
           * Returns a list of dictionaries containing: id, suggested, score, reason, assigned(bool), counterparty_name.
         """
-        rows = [
-            r
-            for r in self.dao.list(limit=limit, sort_by="booking_date", sort_dir="desc")
-            if r.category_id is None
-        ][:limit]
+        pagination = PaginationIn(offset=0, limit=limit)
+        sorting = SortParams(sort_by="booking_date", sort_dir="desc")
+        filters = TransactionFilters(has_category=False)
+        rows = self.dao.list(pagination=pagination, sorting=sorting, filters=filters)
+
         out: list[dict] = []
         any_assigned = False
         for tx in rows:
@@ -291,12 +331,22 @@ class TransactionService:
                 }
             )
         if any_assigned:
+            # Commit via DAO abstraction (DAO owns the session lifecycle interaction)
             try:
                 self.dao.commit()
             except Exception:  # pragma: no cover - defensive
-                logger.exception("Failed committing assigned categories; rolling back")
-                self.dao.rollback()
+                logger.exception("Failed committing assigned categories; rolling back via DAO")
+                try:
+                    self.dao.rollback()
+                except Exception:  # pragma: no cover - nested failure
+                    logger.exception("Rollback via DAO also failed")
         return out
+
+    # Helper to list categories for caching / label building
+    def _list_categories_for_cache(self):  # -> list[Category]: circular import avoidance in typing
+        pag = PaginationIn(offset=0, limit=500)
+        sort = SortParams(sort_by=None, sort_dir=None)
+        return self.category_dao.list(pagination=pag, sorting=sort, filters=None)
 
     # --- Internal helpers -----------------------------------------------------
     def _maybe_assign_category(
@@ -330,12 +380,16 @@ class TransactionService:
         if not cat_obj:
             return False
         try:
-            assigned = self.dao.assign_category(str(tx.id), cat_obj.id, commit=commit)
+            # Use DAO to respect data access layer abstraction
+            assigned = self.dao.assign_category(tx.id, cat_obj.id, commit=commit)
             return assigned
         except Exception:  # pragma: no cover - defensive
             logger.exception("Auto-assign category via DAO failed; rolling back")
             if commit:
-                self.dao.rollback()
+                try:
+                    self.dao.rollback()
+                except Exception:  # pragma: no cover
+                    logger.exception("DAO rollback failed")
             return False
 
     def _extract_single_table(self, raw: bytes) -> bytes:
