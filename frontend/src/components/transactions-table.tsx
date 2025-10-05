@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Check, X, ArrowUp, ArrowDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { mutate as globalMutate } from 'swr';
 import AsyncCategorySelect from './AsyncCategorySelect';
@@ -36,21 +37,53 @@ function meta<T extends object>(col: any): import('@tanstack/react-table').Colum
 	return col.columnDef?.meta as any;
 }
 
-interface TransactionsTableProps { initialLimit?: number }
+interface TransactionsTableProps { initialLimit?: number; initialCategoryName?: string; initialHasCategory?: boolean; initialDateFrom?: string; initialDateTo?: string }
 
 type Row = Transaction;
 
-export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLimit = 25 }) => {
+export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLimit = 25, initialCategoryName, initialHasCategory, initialDateFrom, initialDateTo }) => {
 	// server paging & sorting
 	const [offset, setOffset] = useState(0);
 	const [limit, setLimit] = useState(initialLimit);
 	const [sortBy, setSortBy] = useState<string | undefined>('transaction_number');
 	const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>('desc');
-	const { data, isLoading, mutate: mutatePages } = useTransactionsPage({ offset, limit, sortBy, sortDir });
+	// Filters state
+	const [counterpartySearch, setCounterpartySearch] = useState('');
+	const [typeSearch, setTypeSearch] = useState('');
+	const [notesSearch, setNotesSearch] = useState('');
+	const [categoryIdFilter, setCategoryIdFilter] = useState<string | undefined>(undefined);
+	const [hasCategory, setHasCategory] = useState<boolean | undefined>(initialHasCategory);
+
+	const [dateFrom, setDateFrom] = useState<string | undefined>(initialDateFrom);
+	const [dateTo, setDateTo] = useState<string | undefined>(initialDateTo);
+
+	const filters = useMemo(() => ({
+		counterparty_name_ilike: counterpartySearch || undefined,
+		transaction_type_ilike: typeSearch || undefined,
+		notes_ilike: notesSearch || undefined,
+		category_id: categoryIdFilter || undefined,
+		has_category: hasCategory,
+		booking_date_gte: dateFrom || undefined,
+		booking_date_lte: dateTo || undefined,
+	}), [counterpartySearch, typeSearch, notesSearch, categoryIdFilter, hasCategory, dateFrom, dateTo]);
+
+	const { data, isLoading, mutate: mutatePages } = useTransactionsPage({ offset, limit, sortBy, sortDir, filters });
 	const rows = data?.items ?? [];
 	const total = data?.total;
 	const hasMore = data?.has_more ?? false;
 	const { data: categories } = useCategories();
+
+	// Apply initial category name -> id mapping once categories load
+	useEffect(() => {
+		if (!categories) return;
+		if (initialCategoryName && !categoryIdFilter) {
+			const match = categories.find(c => c.name.toLowerCase() === initialCategoryName.toLowerCase());
+			if (match) {
+				setCategoryIdFilter(match.id);
+				setOffset(0);
+			}
+		}
+	}, [categories, initialCategoryName, categoryIdFilter]);
 
 	// Inline category editing
 	const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,7 +123,19 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 			accessorKey: 'account',
 			header: () => 'Account',
 			enableSorting: true,
-			cell: info => <span className="whitespace-nowrap">{info.getValue<string>()}</span>,
+			cell: info => {
+				const r = info.row.original;
+				const val = info.getValue<string>();
+				return (
+					<Link
+						href={`/transactions/${r.id}`}
+						className="whitespace-nowrap text-primary underline hover:underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 rounded-sm"
+						title="View transaction details"
+					>
+						{val}
+					</Link>
+				);
+			},
 			meta: { width: '15rem', sticky: true, left: 'var(--tx-sticky-offset-account, 2.25rem)' },
 		},
 		{
@@ -275,6 +320,47 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 
 	return (
 		<div className="rounded-md border bg-background p-2 min-h-[420px] space-y-2" data-tx-table-wrapper>
+			{/* Filter bar */}
+			<div className="flex flex-col gap-2 p-1 border-b pb-2">
+				<div className="flex flex-wrap gap-2 items-end">
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Counterparty</label>
+						<input value={counterpartySearch} onChange={e => { setCounterpartySearch(e.target.value); setOffset(0); }} placeholder="Search name..." className="border rounded px-2 py-1 text-xs w-44" />
+					</div>
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Type</label>
+						<input value={typeSearch} onChange={e => { setTypeSearch(e.target.value); setOffset(0); }} placeholder="Search type..." className="border rounded px-2 py-1 text-xs w-40" />
+					</div>
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Notes</label>
+						<input value={notesSearch} onChange={e => { setNotesSearch(e.target.value); setOffset(0); }} placeholder="Search notes..." className="border rounded px-2 py-1 text-xs w-48" />
+					</div>
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Category</label>
+						<select value={categoryIdFilter || ''} onChange={e => { setCategoryIdFilter(e.target.value || undefined); setOffset(0); }} className="border rounded px-1 py-1 text-xs w-40">
+							<option value="">All</option>
+							{(categories || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+						</select>
+					</div>
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Date From</label>
+						<input type="date" value={dateFrom || ''} onChange={e => { setDateFrom(e.target.value || undefined); setOffset(0); }} className="border rounded px-2 py-1 text-xs w-36" />
+					</div>
+					<div className="flex flex-col">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Date To</label>
+						<input type="date" value={dateTo || ''} onChange={e => { setDateTo(e.target.value || undefined); setOffset(0); }} className="border rounded px-2 py-1 text-xs w-36" />
+					</div>
+					<div className="flex items-center gap-2 mt-4">
+						<label className="text-[10px] uppercase tracking-wide text-muted-foreground">Has Category</label>
+						<select value={hasCategory === undefined ? '' : hasCategory ? '1' : '0'} onChange={e => { const val = e.target.value; setHasCategory(val === '' ? undefined : val === '1'); setOffset(0); }} className="border rounded px-1 py-1 text-xs">
+							<option value="">Any</option>
+							<option value="1">Yes</option>
+							<option value="0">No</option>
+						</select>
+					</div>
+					<button type="button" onClick={() => { setCounterpartySearch(''); setTypeSearch(''); setNotesSearch(''); setCategoryIdFilter(undefined); setHasCategory(undefined); setDateFrom(undefined); setDateTo(undefined); setOffset(0); }} className="text-xs underline ml-auto">Reset</button>
+				</div>
+			</div>
 			{selectedRows.length > 0 && (
 				<div className="flex flex-wrap items-center gap-2 px-1 text-xs">
 					<span className="text-muted-foreground">{selectedRows.length} selected</span>

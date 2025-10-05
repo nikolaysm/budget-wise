@@ -5,7 +5,7 @@ Currently only assignment payloads live here. Read / write models moved to `app.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import UUID4, BaseModel, Field
 
 
 class CategoryAssign(BaseModel):
@@ -22,4 +22,4 @@ class CategoryBulkAssign(BaseModel):
         max_length=128,
         description="Existing category name to assign to all provided transactions",
     )
-    transaction_ids: list[str] = Field(min_length=1, description="List of transaction UUIDs")
+    transaction_ids: list[UUID4] = Field(min_length=1, description="List of transaction UUIDs")

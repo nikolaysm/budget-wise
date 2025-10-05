@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Link from 'next/link';
 import { useCategories, updateCategory, addCategory } from '@/lib/hooks/useCategories';
-import { QuickCategoryBar } from '@/components/quick-category-bar';
+import { ClientTransactionStatsCards } from '@/components/client-transaction-stats-cards';
 
 export default function CategoriesPage() {
     const { data: categories, isLoading, mutate } = useCategories();
@@ -85,6 +85,7 @@ export default function CategoriesPage() {
                 <h1 className="text-2xl font-semibold">Categories</h1>
                 <Link href="/transactions" className="text-sm underline">← Transactions</Link>
             </div>
+            <ClientTransactionStatsCards className="mb-4" />
             <form onSubmit={createForm.handleSubmit(createNew)} className="space-y-2 border rounded p-3 bg-background">
                 <h2 className="text-sm font-medium">Create New Category</h2>
                 <div className="grid md:grid-cols-3 gap-2">

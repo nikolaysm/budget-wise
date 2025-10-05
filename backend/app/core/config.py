@@ -45,6 +45,9 @@ def get_settings() -> Settings:
     return Settings()
 
 
+settings = get_settings()
+
+
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -67,10 +70,13 @@ LOGGING_CONFIG = {
         },
     },
     "loggers": {
-        get_settings().app_logger_name: {
+        settings.app_logger_name: {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
     },
 }
+
+
+__all__ = ["Settings", "get_settings", "settings", "LOGGING_CONFIG"]

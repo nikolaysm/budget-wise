@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from app.api.deps import get_category_service
 from app.models.category import CategoryIn, CategoryOut
+from app.schemas import PaginationIn, SortParams
 from app.schemas.category import CategoryAssign, CategoryBulkAssign
 from app.services.category_service import CategoryService
 
@@ -18,7 +20,10 @@ router = APIRouter()
 def list_categories(
     service: Annotated[CategoryService, Depends(get_category_service)],
 ) -> list[CategoryOut]:
-    cats = service.list(limit=500)
+    pagination = PaginationIn(offset=0, limit=500)
+    sorting = SortParams(sort_by="name", sort_dir="asc")
+    cats = service.list(pagination=pagination, sorting=sorting)
+
     return [
         CategoryOut(
             id=c.id,
@@ -108,27 +113,6 @@ def update_category(
 
 
 @router.post(
-    "/assign/{transaction_id}",
-    summary="Assign an existing category to a transaction (no creation)",
-    response_class=Response,
-)
-def assign_category(
-    transaction_id: Annotated[str, Path(description="Transaction UUID")],
-    payload: CategoryAssign,
-    service: Annotated[CategoryService, Depends(get_category_service)],
-) -> Response:
-    try:
-        service.assign_transaction_category(
-            transaction_id=transaction_id, category_name=payload.category
-        )
-    except ValueError as exc:
-        # differentiate missing category vs transaction
-        detail = str(exc) or "Not found"
-        raise HTTPException(status_code=404, detail=detail) from None
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post(
     "/assign/bulk",
     summary="Bulk assign an existing category to many transactions (no creation)",
 )
@@ -143,3 +127,24 @@ def bulk_assign_category(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
     return {"updated": count}
+
+
+@router.post(
+    "/assign/{transaction_id}",
+    summary="Assign an existing category to a transaction (no creation)",
+    response_class=Response,
+)
+def assign_category(
+    transaction_id: Annotated[UUID, Path(description="Transaction UUID")],
+    payload: CategoryAssign,
+    service: Annotated[CategoryService, Depends(get_category_service)],
+) -> Response:
+    try:
+        service.assign_transaction_category(
+            transaction_id=str(transaction_id), category_name=payload.category
+        )
+    except ValueError as exc:
+        # differentiate missing category vs transaction
+        detail = str(exc) or "Not found"
+        raise HTTPException(status_code=404, detail=detail) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
