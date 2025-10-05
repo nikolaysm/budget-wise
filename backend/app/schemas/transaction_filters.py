@@ -18,7 +18,7 @@ class TransactionFilters(BaseFilters):
     booking_date_lte: date | None = None
     notes_ilike: str | None = None
     counterparty_name_ilike: str | None = None
-    counterparty_name_icontains : str | None = None
+    counterparty_name_icontains: str | None = None
     transaction_type_ilike: str | None = None
 
     FIELD_OPS = {
