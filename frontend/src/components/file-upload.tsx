@@ -1,12 +1,14 @@
 "use client";
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Upload, Loader2 } from 'lucide-react';
+import { X } from "lucide-react"
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Upload, Loader2 } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import { Progress } from '@/components/ui/progress';
-import { X } from "lucide-react"
+
 
 /**
  * FileUpload component allows users to select and submit CSV or Excel files
