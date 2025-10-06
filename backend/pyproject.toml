@@ -5,7 +5,7 @@ description = "FastAPI backend for BudgetWise"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "fastapi",
+  "fastapi[standard]",
   "uvicorn",
   "sqlmodel",
   "alembic",
@@ -16,6 +16,10 @@ dependencies = [
   "psycopg[binary]",
   "pydantic>=2",
   "pydantic-settings>=2",
+  "python-slugify>=8.0.4",
+  "apscheduler>=3.11.0",
+  "httpx[http2]>=0.28.1",
+  "openai>=1.109.1",
 ]
 
 [tool.uv]
@@ -28,10 +32,13 @@ dev-dependencies = [
 target-version = "py311"
 line-length = 100
 indent-width = 4
+extend-exclude = ["tests", "alembic/versions/*"]
 
 [tool.ruff.lint]
 # Add W292 (no newline at end of file) by including the "W" (pycodestyle warnings) class.
-select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4"]
+# FURB - refurb > https://docs.astral.sh/ruff/rules/#refurb-furb
+
+select = ["E", "W", "F", "I", "N", "UP", "B", "S", "C4", "FURB"]
 ignore = ["E203", "E501"]
 
 # [tool.ruff.lint.per-file-ignores]
@@ -41,6 +48,8 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 60
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

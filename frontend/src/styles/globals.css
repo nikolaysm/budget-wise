@@ -4,7 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Optional base overrides */
-html, body {
+html,
+body {
   @apply h-full;
 }
 
@@ -125,5 +126,8 @@ html, body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  button {
+    @apply cursor-pointer;
   }
 }

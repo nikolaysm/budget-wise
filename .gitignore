@@ -4,7 +4,7 @@
 .env.*
 !.env.example
 .env.local
-.vscode/
+# .vscode/
 .idea/
 *.log
 *.tmp

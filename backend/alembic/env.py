@@ -8,23 +8,18 @@ exposes the SQLModel metadata to autogenerate migrations.
 
 from __future__ import annotations
 
-import sys
-from typing import Any, Dict
 from logging.config import fileConfig
-from pathlib import Path
+from typing import Any
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-# sys.path.append(str(Path(__file__).resolve().parents[1] / "app"))  # noqa: E402
-
-from app.core.config import get_settings  # noqa: E402
-import app.models.transaction  # noqa: F401  # ensure Transaction model is loaded
-import app.models.category  # noqa: F401  # ensure Category model is loaded
-import app.models.user  # noqa: F401  # ensure User model is loaded
 import app.models.account  # noqa: F401  # ensure Account model is loaded
-
+import app.models.category  # noqa: F401  # ensure Category model is loaded
+import app.models.transaction  # noqa: F401  # ensure Transaction model is loaded
+import app.models.user  # noqa: F401  # ensure User model is loaded
+from alembic import context
+from app.core.config import get_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -76,7 +71,7 @@ def run_migrations_online() -> None:
     """
 
     # Ensure configuration is a concrete dict for typing
-    configuration: Dict[str, Any] = dict(config.get_section(config.config_ini_section) or {})
+    configuration: dict[str, Any] = dict(config.get_section(config.config_ini_section) or {})
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

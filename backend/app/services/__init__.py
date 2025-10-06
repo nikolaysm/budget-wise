@@ -6,6 +6,7 @@ validation. They intentionally avoid FastAPI specifics to ease reuse.
 
 from __future__ import annotations
 
-from .transaction_service import TransactionService  # noqa: F401
+from .category_service import CategoryService
+from .transaction_service import TransactionService
 
-__all__ = ["TransactionService"]
+__all__ = ["TransactionService", "CategoryService"]
