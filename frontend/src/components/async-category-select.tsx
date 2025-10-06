@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import AsyncSelect from 'react-select/async';
+// (react-select style object typings can vary by version; using loose typing to avoid namespace issues)
 import axios from 'axios';
 
 interface Option { label: string; value: string; }
@@ -16,6 +17,10 @@ interface AsyncCategorySelectProps {
     debounceMs?: number; // debounce between keystrokes before firing request
 }
 
+interface StyleObj { [key: string]: unknown }
+
+type StyleFn = (base: StyleObj) => StyleObj;
+
 export const AsyncCategorySelect: React.FC<AsyncCategorySelectProps> = ({
     value,
     onChange,
@@ -26,7 +31,7 @@ export const AsyncCategorySelect: React.FC<AsyncCategorySelectProps> = ({
     minLength = 1,
     debounceMs = 250,
 }) => {
-    const timeoutRef = React.useRef<any>();
+    const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const [initialOptions, setInitialOptions] = React.useState<Option[]>([]);
     const [initialLoaded, setInitialLoaded] = React.useState(false);
 
@@ -66,14 +71,25 @@ export const AsyncCategorySelect: React.FC<AsyncCategorySelectProps> = ({
 
     const selected: Option | null = value ? { label: value, value } : null;
 
+    const styles: Record<string, StyleFn> = {
+        control: (base) => ({ ...base, minHeight: 26, height: 26, fontSize: 12 }),
+        valueContainer: (base) => ({ ...base, padding: '0 4px' }),
+        indicatorsContainer: (base) => ({ ...base, height: 24 }),
+        dropdownIndicator: (base) => ({ ...base, padding: 2 }),
+        clearIndicator: (base) => ({ ...base, padding: 2 }),
+        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        menu: (base) => ({ ...base, fontSize: 12 }),
+        option: (base) => ({ ...base, padding: '4px 8px' }),
+    };
+
     return (
-        <AsyncSelect
+        <AsyncSelect<Option, false>
             cacheOptions
             // Provide preloaded category list so results show immediately on open
             defaultOptions={initialOptions}
             loadOptions={loadOptions}
             value={selected}
-            onChange={(opt: any) => onChange(opt ? opt.value : null)}
+            onChange={(opt) => onChange(opt ? opt.value : null)}
             placeholder={placeholder}
             isClearable
             inputId="transaction-category-async"
@@ -85,16 +101,7 @@ export const AsyncCategorySelect: React.FC<AsyncCategorySelectProps> = ({
             noOptionsMessage={({ inputValue }) => (
                 inputValue && inputValue.length < minLength ? `Type ${minLength} char` : 'No matches'
             )}
-            styles={{
-                control: (base: any) => ({ ...base, minHeight: 26, height: 26, fontSize: 12 }),
-                valueContainer: (base: any) => ({ ...base, padding: '0 4px' }),
-                indicatorsContainer: (base: any) => ({ ...base, height: 24 }),
-                dropdownIndicator: (base: any) => ({ ...base, padding: 2 }),
-                clearIndicator: (base: any) => ({ ...base, padding: 2 }),
-                menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                menu: (base: any) => ({ ...base, fontSize: 12 }),
-                option: (base: any) => ({ ...base, padding: '4px 8px' }),
-            }}
+            styles={styles}
             autoFocus={autoFocus}
         />
     );

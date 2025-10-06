@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Check, X, ArrowUp, ArrowDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { mutate as globalMutate } from 'swr';
@@ -16,12 +17,12 @@ import {
 import clsx from 'clsx';
 
 import { assignTransactionCategory, optimisticUpdateTransactionCategories, bulkAssignTransactionCategory, Transaction } from '@/services/api';
-import { useCategories } from '@/lib/hooks/useCategories';
-import { useTransactionsPage } from '@/lib/hooks/useTransactionsPage';
+import { useCategories } from '@/lib/hooks/use-categories';
+import { useTransactionsPage } from '@/lib/hooks/use-transactions-page';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import TransactionNumberCell from './TransactionNumberCell';
-import AsyncCategorySelect from './AsyncCategorySelect';
+import TransactionNumberCell from './transaction-number-cell';
+import AsyncCategorySelect from './async-category-select';
 
 
 // --- Type augmentation for custom column meta fields -----------------------
@@ -36,8 +37,8 @@ declare module '@tanstack/react-table' {
 }
 
 // Helper to get meta with inferred type (avoids many optional chains)
-function meta<T extends object>(col: any): import('@tanstack/react-table').ColumnMeta<T, unknown> | undefined {
-	return col.columnDef?.meta as any;
+function meta<T extends object>(col: { columnDef?: { meta?: unknown } }): import('@tanstack/react-table').ColumnMeta<T, unknown> | undefined {
+	return col.columnDef?.meta as import('@tanstack/react-table').ColumnMeta<T, unknown> | undefined;
 }
 
 interface TransactionsTableProps { initialLimit?: number; initialCategoryName?: string; initialHasCategory?: boolean; initialDateFrom?: string; initialDateTo?: string }
@@ -45,6 +46,21 @@ interface TransactionsTableProps { initialLimit?: number; initialCategoryName?: 
 type Row = Transaction;
 
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLimit = 25, initialCategoryName, initialHasCategory, initialDateFrom, initialDateTo }) => {
+	const router = useRouter();
+	const pathname = usePathname();
+	// Encapsulated filter reset logic so it can be reused (e.g. future toolbar buttons)
+	const resetFilters = useCallback(() => {
+		setCounterpartySearch('');
+		setTypeSearch('');
+		setNotesSearch('');
+		setCategoryIdFilter(undefined);
+		setHasCategory(undefined);
+		setDateFrom(undefined);
+		setDateTo(undefined);
+		setOffset(0);
+		// Remove all related query params from URL (shallow replace without scroll jump)
+		router.replace(pathname, { scroll: false });
+	}, [pathname, router]);
 	// server paging & sorting
 	const [offset, setOffset] = useState(0);
 	const [limit, setLimit] = useState(initialLimit);
@@ -71,35 +87,40 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 	}), [counterpartySearch, typeSearch, notesSearch, categoryIdFilter, hasCategory, dateFrom, dateTo]);
 
 	const { data, isLoading, mutate: mutatePages } = useTransactionsPage({ offset, limit, sortBy, sortDir, filters });
-	const rows = data?.items ?? [];
+	const rows = useMemo(() => data?.items ?? [], [data?.items]);
 	const total = data?.total;
 	const hasMore = data?.has_more ?? false;
 	const { data: categories } = useCategories();
 
-	// Apply initial category name -> id mapping once categories load
+	// Apply initial category name -> id mapping only once (avoid re-adding after user Reset)
+	const didApplyInitialCategory = useRef(false);
 	useEffect(() => {
+		if (didApplyInitialCategory.current) return; // already applied
 		if (!categories) return;
-		if (initialCategoryName && !categoryIdFilter) {
+		if (initialCategoryName) {
 			const match = categories.find(c => c.name.toLowerCase() === initialCategoryName.toLowerCase());
 			if (match) {
-				setCategoryIdFilter(match.id);
+				setCategoryIdFilter(prev => prev ?? match.id); // don't override if user already set something
 				setOffset(0);
 			}
 		}
-	}, [categories, initialCategoryName, categoryIdFilter]);
+		didApplyInitialCategory.current = true;
+	}, [categories, initialCategoryName]);
 
 	// Inline category editing
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [editingValue, setEditingValue] = useState('');
 	const beginEdit = (row: Row) => { setEditingId(row.id); setEditingValue(row.category || ''); };
 	const cancelEdit = () => { setEditingId(null); setEditingValue(''); };
-	const commitEdit = async (row: Row) => {
+	const commitEdit = useCallback(async (row: Row) => {
 		const value = editingValue.trim();
 		setEditingId(null);
 		if (!value) return;
-		optimisticUpdateTransactionCategories(globalMutate as any, (tx) => tx.id === row.id, (tx) => ({ ...tx, category: value }));
+		const mutateTyped = globalMutate as Parameters<typeof optimisticUpdateTransactionCategories>[0];
+		optimisticUpdateTransactionCategories(mutateTyped, (tx) => tx.id === row.id, (tx) => ({ ...tx, category: value }));
 		try { await assignTransactionCategory(row.id, value); mutatePages(); } catch (e) { console.error(e); }
-	};
+		// editingValue & mutatePages in deps
+	}, [editingValue, mutatePages]);
 
 	// Bulk selection operations
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -111,9 +132,10 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 		const name = bulkCategory.trim();
 		if (!name || selectedRows.length === 0) return;
 		setBulkBusy(true); setBulkError(null);
-		optimisticUpdateTransactionCategories(globalMutate as any, (tx) => selectedRows.some(r => r.id === tx.id), (tx) => ({ ...tx, category: name }));
+		const mutateTyped = globalMutate as Parameters<typeof optimisticUpdateTransactionCategories>[0];
+		optimisticUpdateTransactionCategories(mutateTyped, (tx) => selectedRows.some(r => r.id === tx.id), (tx) => ({ ...tx, category: name }));
 		try { await bulkAssignTransactionCategory(selectedRows.map(r => r.id), name); setBulkCategory(''); setRowSelection({}); mutatePages(); }
-		catch (e: any) { setBulkError(e?.message || 'Bulk assign failed'); }
+		catch (e: unknown) { setBulkError(e instanceof Error ? e.message : 'Bulk assign failed'); }
 		finally { setBulkBusy(false); }
 	};
 
@@ -250,7 +272,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 			cell: info => <span>{info.getValue<string>() || '-'}</span>,
 			meta: { width: '5rem', numeric: true },
 		},
-	], [editingId, editingValue]);
+	], [editingId, editingValue, commitEdit, mutatePages]);
 
 	// React Table instance (selection column added dynamically)
 	const [sorting, setSorting] = useState<SortingState>([{ id: sortBy || 'transaction_number', desc: sortDir === 'desc' }]);
@@ -263,7 +285,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 			setSortDir(s.desc ? 'desc' : 'asc');
 			setOffset(0);
 		}
-		 
+
 	}, [sorting]);
 
 	const table = useReactTable({
@@ -361,7 +383,13 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 							<option value="0">No</option>
 						</select>
 					</div>
-					<button type="button" onClick={() => { setCounterpartySearch(''); setTypeSearch(''); setNotesSearch(''); setCategoryIdFilter(undefined); setHasCategory(undefined); setDateFrom(undefined); setDateTo(undefined); setOffset(0); }} className="text-xs underline ml-auto">Reset</button>
+					<button
+						type="button"
+						onClick={resetFilters}
+						className="text-xs underline ml-auto"
+					>
+						Reset
+					</button>
 				</div>
 			</div>
 			{selectedRows.length > 0 && (
@@ -387,7 +415,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({ initialLim
 			{isLoading && rows.length === 0 ? (
 				initialSkeleton
 			) : (
-				<div className="overflow-auto max-h-[60vh]" data-tx-table-container style={{ ['--tx-selection-col-width' as any]: '2.25rem' }}>
+				<div className="overflow-auto max-h-[60vh]" data-tx-table-container style={{ '--tx-selection-col-width': '2.25rem' } as React.CSSProperties}>
 					<table className="w-full text-xs border-collapse" data-tx-table>
 						<thead className="bg-background sticky top-0 z-30">
 							<tr>
