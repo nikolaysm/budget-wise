@@ -9,6 +9,7 @@ import { FlatCompat } from '@eslint/eslintrc';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import importPlugin from 'eslint-plugin-import';
+import nextPlugin from '@next/eslint-plugin-next';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,6 +51,7 @@ export default defineConfig([
             react: reactPlugin,
             'react-hooks': reactHooksPlugin,
             import: importPlugin,
+            '@next/next': nextPlugin,
         },
         settings: {
             react: { version: 'detect' },
@@ -68,6 +70,24 @@ export default defineConfig([
             'import/order': ['warn', { groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'], 'newlines-between': 'always' }],
             'import/no-unresolved': 'off', // Next.js / TS handles this
             '@typescript-eslint/no-unnecessary-type-constraint': 'off', // temp during migration
+            // Enforce consistent member ordering within import statements.
+            // Let import/order handle grouping; ignoreDeclarationSort avoids conflict.
+            'sort-imports': ['warn', {
+                ignoreCase: true,
+                ignoreDeclarationSort: true, // defer module-level ordering to import/order
+                ignoreMemberSort: false,
+                memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single'],
+                allowSeparatedGroups: true,
+            }],
+            // Enforce 4-space indentation (aligns with editor.tabSize for TS)
+            indent: ['error', 4, {
+                SwitchCase: 1,
+                VariableDeclarator: 1,
+                ImportDeclaration: 1,
+                flatTernaryExpressions: false,
+                offsetTernaryExpressions: false,
+                ignoreComments: false,
+            }],
         }
     },
 ]);

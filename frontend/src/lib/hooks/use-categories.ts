@@ -1,24 +1,24 @@
 import useSWR from 'swr';
 
-import { listCategories, createCategory, updateCategoryApi, Category, CategoryInput } from '@/services/api';
+import { Category, CategoryInput, createCategory, listCategories, updateCategoryApi } from '@/services/api';
 
 const key = ['categories'];
 
 async function fetcher() {
-  return listCategories();
+    return listCategories();
 }
 
 export function useCategories() {
-  const swr = useSWR<Category[]>(key, fetcher, { revalidateOnFocus: false });
-  return swr;
+    const swr = useSWR<Category[]>(key, fetcher, { revalidateOnFocus: false });
+    return swr;
 }
 
 export async function addCategory(input: CategoryInput, mutate: () => void) {
-  await createCategory(input);
-  mutate();
+    await createCategory(input);
+    mutate();
 }
 
 export async function updateCategory(id: string, input: Partial<CategoryInput>, mutate: () => void) {
-  await updateCategoryApi(id, input);
-  mutate();
+    await updateCategoryApi(id, input);
+    mutate();
 }
