@@ -1,15 +1,17 @@
 import CategorySummary from '@/components/category-summary';
 
-interface DashboardPageProps {
-  searchParams: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>
-}
-
 export const dynamic = 'force-dynamic';
 
-export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-    const sp = await searchParams;
-    const initialFrom = typeof sp?.date_from === 'string' ? sp.date_from : undefined;
-    const initialTo = typeof sp?.date_to === 'string' ? sp.date_to : undefined;
+// Next.js 15 PageProps expects `searchParams?: Promise<any>` in some dynamic contexts.
+// We model it accordingly and await if present.
+export default async function DashboardPage({
+    searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    const sp = searchParams ? await searchParams : {};
+    const initialFrom = typeof sp.date_from === 'string' ? sp.date_from : undefined;
+    const initialTo = typeof sp.date_to === 'string' ? sp.date_to : undefined;
     return (
         <div className="space-y-6">
             <div>

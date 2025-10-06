@@ -79,7 +79,7 @@ export default defineConfig([
                 memberSyntaxSortOrder: ['none', 'all', 'multiple', 'single'],
                 allowSeparatedGroups: true,
             }],
-            // Enforce 4-space indentation (aligns with editor.tabSize for TS)
+            // 4-space indentation (aligns with editor.tabSize for TS)
             indent: ['error', 4, {
                 SwitchCase: 1,
                 VariableDeclarator: 1,
