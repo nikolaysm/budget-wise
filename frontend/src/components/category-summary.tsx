@@ -1,14 +1,15 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { RotateCw } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 
 import { Button } from '@/components/ui/button';
 
-import { getCategorySummary, CategorySummaryItem, CategorySummaryEnvelope } from '../services/categorySummary';
+import { getCategorySummary, CategorySummaryItem, CategorySummaryEnvelope } from '../services/category-summary';
 
-import { DateRangePicker } from './DateRangePicker';
+import { DateRangePicker } from './date-range-picker';
 
 interface Props {
     initialFrom?: string;
@@ -20,6 +21,9 @@ function formatCurrency(n: number) {
 }
 
 export const CategorySummary: React.FC<Props> = ({ initialFrom, initialTo }) => {
+    const router = useRouter();
+    const pathname = usePathname();
+    const currentSearchParams = useSearchParams();
     const [range, setRange] = useState<DateRange | undefined>(() => {
         const from = initialFrom ? new Date(initialFrom) : undefined;
         const to = initialTo ? new Date(initialTo) : undefined;
@@ -33,28 +37,41 @@ export const CategorySummary: React.FC<Props> = ({ initialFrom, initialTo }) => 
     // controls after the component has mounted on the client.
     const [mounted, setMounted] = useState(false);
 
-    async function load() {
+    const syncQueryString = useCallback(() => {
+        // Start with existing params so we preserve unrelated filters if added later
+        const qs = new URLSearchParams(currentSearchParams ? Array.from(currentSearchParams.entries()) : []);
+        if (range?.from) qs.set('date_from', range.from.toISOString().slice(0, 10)); else qs.delete('date_from');
+        if (range?.to) qs.set('date_to', range.to.toISOString().slice(0, 10)); else qs.delete('date_to');
+        const newQs = qs.toString();
+        const target = newQs ? `${pathname}?${newQs}` : pathname;
+        // Avoid unnecessary replace if URL already matches
+        if (typeof window !== 'undefined' && (window.location.search.replace(/^\?/, '') !== newQs)) {
+            router.replace(target, { scroll: false });
+        }
+    }, [range, router, pathname, currentSearchParams]);
+
+    const load = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const params: any = {};
+            const params: Record<string, string> = {};
             if (range?.from) params.date_from = range.from.toISOString().slice(0, 10);
             if (range?.to) params.date_to = range.to.toISOString().slice(0, 10);
             const res = await getCategorySummary(params);
             setEnvelope(res);
-        } catch (e: any) {
-            setError(e?.message || 'Failed to load');
+            // Update URL after successful load
+            syncQueryString();
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : 'Failed to load');
         } finally {
             setLoading(false);
         }
-    }
+    }, [range, syncQueryString]);
 
     useEffect(() => {
         setMounted(true);
-        // Load data once mounted (ensures consistent server/client markup before hydration)
-         
         load();
-    }, []);
+    }, [load]);
 
     const items: CategorySummaryItem[] = envelope?.items || [];
     const total = envelope ? envelope.total_amount : items.reduce((acc, r) => acc + r.total_amount, 0);
@@ -81,7 +98,7 @@ export const CategorySummary: React.FC<Props> = ({ initialFrom, initialTo }) => 
             <div className="flex flex-wrap items-end gap-4">
                 <DateRangePicker
                     value={range}
-                    onChange={setRange}
+                    onChange={(r) => { setRange(r); }}
                     onApply={load}
                 />
                 <Button

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 
-import { useCategories, addCategory } from '@/lib/hooks/useCategories';
+import { useCategories, addCategory } from '@/lib/hooks/use-categories';
 import { cn } from '@/lib/utils';
 
 export interface QuickCategoryBarProps {
@@ -40,11 +40,11 @@ export function QuickCategoryBar({
         setBusy(true);
         setError(null);
         try {
-            await addCategory(trimmed, mutate);
+            await addCategory({ name: trimmed }, mutate);
             setName('');
             onCreated?.(trimmed);
-        } catch (e: any) {
-            setError(e?.message || 'Failed to create');
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : 'Failed to create');
         } finally {
             setBusy(false);
         }

@@ -21,10 +21,32 @@ export async function getCategorySummary(
     baseURL: '/api',
     params,
   });
-  const raw = response.data;
+  type RawCategorySummaryItem = {
+    category?: string | null;
+    count?: number | string | null;
+    total_amount?: number | string | null;
+  };
+  type RawCategorySummaryEnvelope = {
+    items?: RawCategorySummaryItem[] | null;
+    date_from?: string | null;
+    date_to?: string | null;
+    total_amount?: number | string | null;
+    total_count?: number | string | null;
+  };
+
+  const raw: RawCategorySummaryEnvelope = response.data as RawCategorySummaryEnvelope;
+
   // Normalize potential decimal-as-string fields
-  const toNum = (v: any) => (typeof v === 'string' ? parseFloat(v) : v ?? 0);
-  const items: CategorySummaryItem[] = (raw.items || []).map((r: any) => ({
+  const toNum = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const parsed = parseFloat(v);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const items: CategorySummaryItem[] = (raw.items ?? []).map((r) => ({
     category: r.category ?? null,
     count: Number(r.count ?? 0),
     total_amount: toNum(r.total_amount),

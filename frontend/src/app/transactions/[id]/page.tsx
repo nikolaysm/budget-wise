@@ -38,7 +38,7 @@ export default async function TransactionDetailPage({ params }: PageProps) {
     let notFoundError = false;
     try {
         tx = await getTransaction(id);
-    } catch (e: any) {
+    } catch {
         notFoundError = true;
     }
 

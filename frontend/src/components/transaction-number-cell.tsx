@@ -46,19 +46,31 @@ const TransactionNumberCell: React.FC<Props> = ({ id, transactionNumber, mutateP
     setBusy(true);
     setError(null);
     // Optimistic update of SWR transaction pages cache
-    (globalMutate as any)((key: any) => Array.isArray(key) && key[0] === 'transactions', (data: any) => {
-      if (!data) return data;
-      const copy = { ...data };
-      copy.items = data.items.map((tx: Transaction) => tx.id === id ? { ...tx, transaction_number: parsed } : tx);
-      return copy;
-    }, { revalidate: false });
+    type MutateFn = <T = unknown>(
+      key: unknown | ((key: unknown) => boolean),
+      data?: T | Promise<T> | ((current: T | undefined) => T | undefined),
+      opts?: { revalidate?: boolean }
+    ) => Promise<T | undefined>;
+    const mutateGlobal = globalMutate as MutateFn;
+    mutateGlobal(
+      (key: unknown) => Array.isArray(key) && (key as unknown[])[0] === 'transactions',
+      (data) => {
+        const state = data as { items: Transaction[] } | undefined;
+        if (!state) return state;
+        return {
+          ...state,
+          items: state.items.map(tx => tx.id === id ? { ...tx, transaction_number: parsed } : tx)
+        };
+      },
+      { revalidate: false }
+    );
     try {
       await setTransactionNumber(id, parsed);
       mutatePages();
       setEditing(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setError(e?.message || 'Failed');
+      setError(e instanceof Error ? e.message : 'Failed');
     } finally {
       setBusy(false);
     }

@@ -46,7 +46,22 @@ if (process.env.NODE_ENV !== 'production') {
   })
   apiClient.interceptors.response.use(
     (resp) => { console.debug('[api.response]', resp.status, resp.config.method?.toUpperCase(), (resp.config.baseURL || '') + (resp.config.url || '')); return resp },
-    (error) => { const cfg = error.config as AxiosRequestConfig | undefined; console.warn('[api.error]', cfg?.method?.toUpperCase(), (cfg?.baseURL || '') + (cfg?.url || ''), error.response?.status, error.message); return Promise.reject(error) }
+    async (error) => {
+      const cfg = error.config as (AxiosRequestConfig & { __retryCount?: number }) | undefined
+      const code = (error.code || '').toUpperCase()
+      const retriable = code === 'ECONNREFUSED' || code === 'ECONNRESET'
+      if (retriable && cfg) {
+        cfg.__retryCount = (cfg.__retryCount || 0) + 1
+        if (cfg.__retryCount <= 3) {
+          const delay = 150 * cfg.__retryCount
+          console.warn('[api.retry]', code, 'attempt', cfg.__retryCount, 'after', delay, 'ms')
+          await new Promise(r => setTimeout(r, delay))
+          return apiClient.request(cfg)
+        }
+      }
+      console.warn('[api.error]', cfg?.method?.toUpperCase(), (cfg?.baseURL || '') + (cfg?.url || ''), error.response?.status, error.message)
+      return Promise.reject(error)
+    }
   )
 }
 
@@ -56,17 +71,33 @@ export async function updateCategoryApi(id: string, input: Partial<CategoryInput
 export async function assignTransactionCategory(transactionId: string, category: string): Promise<void> { await apiClient.post(`/categories/assign/${transactionId}`, { category }) }
 export async function bulkAssignTransactionCategory(transactionIds: string[], category: string): Promise<number> { return (await apiClient.post<{ updated: number }>(`/categories/assign/bulk`, { transaction_ids: transactionIds, category })).data.updated }
 
+// Narrow SWR mutate signature we rely on (subset of actual types) to avoid 'any'
+interface SwrMutateOptions { revalidate?: boolean }
+type SwrKey = unknown
+type TransactionListState = PaginationResponse<Transaction>
+type SwrMutate = <T = unknown>(
+  key: SwrKey | ( (key: SwrKey) => boolean ),
+  data?: T | ( (current: T | undefined) => T | undefined ),
+  opts?: SwrMutateOptions
+) => Promise<T | undefined>
+
 export function optimisticUpdateTransactionCategories(
-  mutate: (key?: any, data?: any, opts?: any) => Promise<any>,
+  mutate: SwrMutate,
   predicate: (tx: Transaction) => boolean,
   updater: (old: Transaction) => Transaction,
-) {
-  mutate((key: any) => Array.isArray(key) && key[0] === 'transactions', (data: any) => {
-    if (!data) return data
-    const copy = { ...data }
-    copy.items = data.items.map((tx: Transaction) => predicate(tx) ? updater(tx) : tx)
-    return copy
-  }, { revalidate: false })
+) : void {
+  mutate(
+    (key: SwrKey) => Array.isArray(key) && (key as unknown[])[0] === 'transactions',
+    (data) => {
+      const state = data as TransactionListState | undefined
+      if (!state) return state
+      return {
+        ...state,
+        items: state.items.map(tx => (predicate(tx) ? updater(tx) : tx))
+      }
+    },
+    { revalidate: false }
+  )
 }
 
 export interface PaginationResponse<T> { items: T[]; offset: number; limit: number; total?: number; has_more: boolean; next?: number | null; previous?: number | null }
@@ -74,7 +105,7 @@ export interface TransactionListFilters { counterparty_name_ilike?: string; tran
 
 export async function uploadTransactions(file: File): Promise<Transaction[]> { const form = new FormData(); form.append('file', file); return (await apiClient.post<Transaction[]>('/transactions/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data }
 export async function listTransactions(offset = 0, limit = 100, sortBy?: string, sortDir?: 'asc' | 'desc', filters?: TransactionListFilters): Promise<PaginationResponse<Transaction>> {
-  const params: Record<string, any> = { offset, limit }
+  const params: Record<string, string | number | boolean> = { offset, limit }
   if (sortBy) params.sort_by = sortBy
   if (sortDir) params.sort_dir = sortDir
   if (filters) for (const [k, v] of Object.entries(filters)) if (v !== undefined && v !== null && v !== '') params[k] = v

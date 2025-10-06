@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import Link from 'next/link';
 
-import { useCategories, updateCategory, addCategory } from '@/lib/hooks/useCategories';
+import { useCategories, updateCategory, addCategory } from '@/lib/hooks/use-categories';
 import { ClientTransactionStatsCards } from '@/components/client-transaction-stats-cards';
 
 export default function CategoriesPage() {
@@ -53,8 +53,9 @@ export default function CategoriesPage() {
             }, mutate);
             setRenameId(null);
             editForm.reset();
-        } catch (err: any) {
-            setError(err?.message || 'Update failed');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Update failed';
+            setError(message);
         } finally {
             setBusy(false);
         }
@@ -73,8 +74,9 @@ export default function CategoriesPage() {
                 aliases: aliasesArr,
             }, mutate);
             createForm.reset();
-        } catch (err: any) {
-            setError(err?.message || 'Create failed');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Create failed';
+            setError(message);
         } finally {
             setBusy(false);
         }

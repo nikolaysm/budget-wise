@@ -49,7 +49,10 @@ function Calendar({
         className
       )}
       captionLayout={captionLayout}
-      style={{ ['--calendar-cell-size' as any]: resolvedCellSize, ['--calendar-month-min-width' as any]: resolvedMonthMinWidth }}
+      style={{
+        '--calendar-cell-size': resolvedCellSize,
+        '--calendar-month-min-width': resolvedMonthMinWidth,
+      } as React.CSSProperties}
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString("default", { month: "short" }),
