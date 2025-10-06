@@ -33,6 +33,7 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@next/eslint-plugin-next": "^15.5.0",
     "@babel/core": "^7.25.0",
     "@babel/eslint-parser": "^7.25.0",
     "@eslint/eslintrc": "^3.3.1",

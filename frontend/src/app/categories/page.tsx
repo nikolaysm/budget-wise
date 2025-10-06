@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { SubmitHandler, useForm } from 'react-hook-form';
 import Link from 'next/link';
 
-import { useCategories, updateCategory, addCategory } from '@/lib/hooks/use-categories';
+import { addCategory, updateCategory, useCategories } from '@/lib/hooks/use-categories';
 import { ClientTransactionStatsCards } from '@/components/client-transaction-stats-cards';
 
 export default function CategoriesPage() {

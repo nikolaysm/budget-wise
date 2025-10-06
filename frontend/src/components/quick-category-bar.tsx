@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 
-import { useCategories, addCategory } from '@/lib/hooks/use-categories';
+import { addCategory, useCategories } from '@/lib/hooks/use-categories';
 import { cn } from '@/lib/utils';
 
 export interface QuickCategoryBarProps {
